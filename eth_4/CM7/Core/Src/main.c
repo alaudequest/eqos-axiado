@@ -1,3 +1,4 @@
+
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -167,120 +168,85 @@ int main(void)
   }
 
   /* 4. Original LAN8742 driver via direct-register MDIO callbacks. */
-  int32_t status = LAN8742_RegisterBusIO(&LAN8742, &LAN8742_IOCtx);
-  if (status == LAN8742_STATUS_OK)
-    status = LAN8742_Init(&LAN8742);
-  if (status == LAN8742_STATUS_OK)
-    status = LAN8742_StartAutoNego(&LAN8742);
-  if (status != LAN8742_STATUS_OK) {
-    printf("LAN8742 init failed: %ld\r\n", (long)status);
-    Error_Handler();
-  }
-  eth.phy_addr = (int)LAN8742.DevAddr;
-  uint32_t start = HAL_GetTick();
-  while (!eth.link_up) {
-    status = LAN8742_GetLinkState(&LAN8742);
-    switch (status) {
-    case LAN8742_STATUS_100MBITS_FULLDUPLEX:
-    case LAN8742_STATUS_100MBITS_HALFDUPLEX:
-      eth.speed = EQOS_SPEED_100;
-      eth.duplex_full = (status == LAN8742_STATUS_100MBITS_FULLDUPLEX);
-      eth.link_up = true;
-      break;
-    case LAN8742_STATUS_10MBITS_FULLDUPLEX:
-    case LAN8742_STATUS_10MBITS_HALFDUPLEX:
-      eth.speed = EQOS_SPEED_10;
-      eth.duplex_full = (status == LAN8742_STATUS_10MBITS_FULLDUPLEX);
-      eth.link_up = true;
-      break;
-    case LAN8742_STATUS_LINK_DOWN:
-    case LAN8742_STATUS_AUTONEGO_NOTDONE:
-      break;
-    default:
-      printf("LAN8742 link read failed: %ld\r\n", (long)status);
-      Error_Handler();
-    }
-    if (!eth.link_up) {
-      if ((uint32_t)(HAL_GetTick() - start) >= eth.cfg.aneg_timeout_ms) {
-        printf("LAN8742 link timeout: %ld\r\n", (long)status);
-        Error_Handler();
-      }
-      HAL_Delay(10);
-    }
-  }
+//  int32_t status = LAN8742_RegisterBusIO(&LAN8742, &LAN8742_IOCtx);
+//  if (status == LAN8742_STATUS_OK)
+//    status = LAN8742_Init(&LAN8742);
+//  if (status == LAN8742_STATUS_OK)
+//    status = LAN8742_StartAutoNego(&LAN8742);
+//  if (status != LAN8742_STATUS_OK) {
+//    printf("LAN8742 init failed: %ld\r\n", (long)status);
+//    Error_Handler();
+//  }
+//  eth.phy_addr = (int)LAN8742.DevAddr;
+//  uint32_t start = HAL_GetTick();
+//  while (!eth.link_up) {
+//    status = LAN8742_GetLinkState(&LAN8742);
+//    switch (status) {
+//    case LAN8742_STATUS_100MBITS_FULLDUPLEX:
+//    case LAN8742_STATUS_100MBITS_HALFDUPLEX:
+//      eth.speed = EQOS_SPEED_100;
+//      eth.duplex_full = (status == LAN8742_STATUS_100MBITS_FULLDUPLEX);
+//      eth.link_up = true;
+//      break;
+//    case LAN8742_STATUS_10MBITS_FULLDUPLEX:
+//    case LAN8742_STATUS_10MBITS_HALFDUPLEX:
+//      eth.speed = EQOS_SPEED_10;
+//      eth.duplex_full = (status == LAN8742_STATUS_10MBITS_FULLDUPLEX);
+//      eth.link_up = true;
+//      break;
+//    case LAN8742_STATUS_LINK_DOWN:
+//    case LAN8742_STATUS_AUTONEGO_NOTDONE:
+//      break;
+//    default:
+//      printf("LAN8742 link read failed: %ld\r\n", (long)status);
+//      Error_Handler();
+//    }
+//    if (!eth.link_up) {
+//      if ((uint32_t)(HAL_GetTick() - start) >= eth.cfg.aneg_timeout_ms) {
+//        printf("LAN8742 link timeout: %ld\r\n", (long)status);
+//        Error_Handler();
+//      }
+//      HAL_Delay(10);
+//    }
+//  }
   printf("PHY %d: %d Mbps %s duplex\r\n", eth.phy_addr, (int)eth.speed,
          eth.duplex_full ? "full" : "half");
 
   /* 5. Read each MAC/MTL control once, combine locally, then write once. */
-  uint32_t mac_control = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
-  uint32_t mtl_tx_control = AX_BASE_READ_REG32(EQOS_MTL_BASE, EQOS_MTL_TXQ0_OPERATION_MODE);
-  uint32_t mtl_rx_control = AX_BASE_READ_REG32(EQOS_MTL_BASE, EQOS_MTL_RXQ0_OPERATION_MODE);
-  uint32_t mac_filter = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER);
-  uint32_t mac_tx_flow = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_Q0_TX_FLOW_CTRL);
-  uint32_t mac_rx_flow = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_RX_FLOW_CTRL);
 
-  /* Keep MAC stopped until descriptors are ready. RMII reference stays 50 MHz. */
-  mac_control &= ~(EQOS_MAC_CFG_FES | EQOS_MAC_CFG_DM | EQOS_MAC_CFG_GPSLCE |
-                   EQOS_MAC_CFG_WD | EQOS_MAC_CFG_JD | EQOS_MAC_CFG_JE |
-                   EQOS_MAC_CFG_LM | EQOS_MAC_CFG_TE | EQOS_MAC_CFG_RE);
-  mac_control |= EQOS_MAC_CFG_CST | EQOS_MAC_CFG_ACS;
-  if (eth.speed == EQOS_SPEED_100)
-    mac_control |= EQOS_MAC_CFG_FES;
-  if (eth.duplex_full)
-    mac_control |= EQOS_MAC_CFG_DM;
-  if (eth.cfg.loopback)
-    mac_control |= EQOS_MAC_CFG_LM;
 
-  mtl_tx_control |= EQOS_MTL_TXQ_TSF;
-  if (!eth.duplex_full)
-    mtl_tx_control |= EQOS_MTL_TXQ_FTQ;
-  mtl_rx_control |= EQOS_MTL_RXQ_RSF | EQOS_MTL_RXQ_DISTCPEF;
-  mac_filter &= ~EQOS_MAC_PKT_FILTER_PR;
-  if (eth.cfg.promiscuous)
-    mac_filter |= EQOS_MAC_PKT_FILTER_PR;
-  mac_tx_flow |= (EQOS_MAC_TXFC_PT_MASK << EQOS_MAC_TXFC_PT_SHIFT) | EQOS_MAC_TXFC_TFE;
-  mac_rx_flow |= EQOS_MAC_RXFC_RFE;
 
-  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION, mac_control);
-  AX_BASE_WRITE_REG32(EQOS_MTL_BASE, EQOS_MTL_TXQ0_OPERATION_MODE, mtl_tx_control);
-  AX_BASE_WRITE_REG32(EQOS_MTL_BASE, EQOS_MTL_RXQ0_OPERATION_MODE, mtl_rx_control);
-  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER, mac_filter);
-  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_Q0_TX_FLOW_CTRL, mac_tx_flow);
-  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_RX_FLOW_CTRL, mac_rx_flow);
-  /* Full-value registers need no initial read. */
-  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_ADDRESS0_HIGH,
-      ((uint32_t)eth.cfg.mac_addr[5] << 8) | eth.cfg.mac_addr[4]);
-  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_ADDRESS0_LOW,
-      ((uint32_t)eth.cfg.mac_addr[3] << 24) |
-      ((uint32_t)eth.cfg.mac_addr[2] << 16) |
-      ((uint32_t)eth.cfg.mac_addr[1] << 8) | eth.cfg.mac_addr[0]);
-
-  /* 6. H755 AHB DMA, 16-byte descriptor stride, 1600-byte RX buffers. */
-  /* Read each control once, combine fields locally, then write once.
-   * Preserve unrelated bits and keep DMA stopped until the rings are ready. */
+  /***************************************************** DMA Config *****************************************************/
+  /* Config dma tx control */
   uint32_t tx_dma_control = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL);
+  // tx_dma_control &= ~((EQOS_DMA_CH_TX_TXPBL_MASK << EQOS_DMA_CH_TX_TXPBL_SHIFT) |
+  //                     EQOS_DMA_CH_TX_ST); //Transmit Programmable Burst Length
+  tx_dma_control |= EQOS_DMA_CH_TX_OSP //Operate on Second Packet 
+                  | (8U << EQOS_DMA_CH_TX_TXPBL_SHIFT) // Transmit Programmable Burst Length
+                  | EQOS_DMA_CH_TX_ST; //Start or Stop Transmission Command
+  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL, tx_dma_control);
+
+  /* Config dma rx control */
   uint32_t rx_dma_control = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL);
-  uint32_t dma_control = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL);
-  tx_dma_control &= ~((EQOS_DMA_CH_TX_TXPBL_MASK << EQOS_DMA_CH_TX_TXPBL_SHIFT) |
-                      EQOS_DMA_CH_TX_ST);
-  tx_dma_control |= EQOS_DMA_CH_TX_OSP | (8U << EQOS_DMA_CH_TX_TXPBL_SHIFT);
-  rx_dma_control &= ~((EQOS_DMA_CH_RX_RBSZ_MASK << EQOS_DMA_CH_RX_RBSZ_SHIFT) |
+  rx_dma_control &= ~((EQOS_DMA_CH_RX_RBSZ_MASK << EQOS_DMA_CH_RX_RBSZ_SHIFT) | 
                       (EQOS_DMA_CH_RX_RXPBL_MASK << EQOS_DMA_CH_RX_RXPBL_SHIFT) |
                       EQOS_DMA_CH_RX_SR);
-  rx_dma_control |= (EQOS_BUF_SIZE << EQOS_DMA_CH_RX_RBSZ_SHIFT) |
-                    (8U << EQOS_DMA_CH_RX_RXPBL_SHIFT);
-  dma_control &= ~(EQOS_DMA_CH_CTRL_DSL_MASK << EQOS_DMA_CH_CTRL_DSL_SHIFT);
-  dma_control |= EQOS_DMA_CH_CTRL_PBLX8; /* DSL=0, contiguous descriptors. */
-  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL,
-      tx_dma_control);
-  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL,
-      rx_dma_control);
-  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL,
-      dma_control);
+  rx_dma_control |= (EQOS_BUF_SIZE << EQOS_DMA_CH_RX_RBSZ_SHIFT)  //Receive Buffer size
+                  | (8U << EQOS_DMA_CH_RX_RXPBL_SHIFT) //Receive Programmable Burst Length
+                  | EQOS_DMA_CH_RX_SR; //Start or Stop Receive
+
+  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL,rx_dma_control);
+  /* Config dma control */
+  uint32_t dma_control = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL);
+   
+  // dma_control &= ~(EQOS_DMA_CH_CTRL_DSL_MASK << EQOS_DMA_CH_CTRL_DSL_SHIFT);
+  dma_control |= EQOS_DMA_CH_CTRL_PBLX8; /* DSL=0, contiguous descriptors. */ //Descriptor Skip Length 
+  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL,dma_control);
+  /* Bus mode*/
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_SYSBUS_MODE,
-      EQOS_DMA_SYSBUS_AHB_AAL | EQOS_DMA_SYSBUS_AHB_FB);
-  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_INTERRUPT_ENABLE,
-      0U);
+                        EQOS_DMA_SYSBUS_AHB_AAL //Address-Aligned Beats
+                        | EQOS_DMA_SYSBUS_AHB_FB); //  Fixed Burst Length
+  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_INTERRUPT_ENABLE,0U); //Disable Interrupt
 
   /* 7. Initialize TX/RX descriptors and register both rings with DMA. */
   for (uint32_t i = 0; i < EQOS_TX_DESC_COUNT; ++i) {
@@ -298,33 +264,97 @@ int main(void)
   }
   __DSB();
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_LIST_ADDR,
-      (uint32_t)(uintptr_t)&tx_desc[0]);
+      (uint32_t)(uintptr_t)&tx_desc[0]); //Tx List Address
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_RING_LEN,
-      EQOS_TX_DESC_COUNT - 1U);
+      EQOS_TX_DESC_COUNT - 1U); //Tx Ring length
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_LIST_ADDR,
-      (uint32_t)(uintptr_t)&rx_desc[0]);
+      (uint32_t)(uintptr_t)&rx_desc[0]); //Rx List Address
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_RING_LEN,
-      EQOS_RX_DESC_COUNT - 1U);
+      EQOS_RX_DESC_COUNT - 1U);  //Rx Ring length
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR,
-      (uint32_t)(uintptr_t)&tx_desc[0]);
+      (uint32_t)(uintptr_t)&tx_desc[0]); //Tx Tail Pointer
   /* Preserve the supplied driver's last-descriptor RX tail convention. */
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_TAIL_PTR,
-      (uint32_t)(uintptr_t)&rx_desc[EQOS_RX_DESC_COUNT - 1U]);
+      (uint32_t)(uintptr_t)&rx_desc[EQOS_RX_DESC_COUNT - 1U]);//Rx Tail Pointer
   eth.tx_head = 0;
   eth.rx_head = 0;
 
-  /* 8. Enable DMA and MAC, then construct the same raw test frame. */
-  /* No intervening writer changes these controls; reuse the prepared values. */
-  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL,
-      tx_dma_control | EQOS_DMA_CH_TX_ST);
-  AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL,
-      rx_dma_control | EQOS_DMA_CH_RX_SR);
+
+  
+
+  /***************************************************** End DMA Config *****************************************************/
+
+
+  /***************************************************** MTL Config *****************************************************/
+  /* Config MTL Tx Control*/  
+  uint32_t mtl_tx_control = AX_BASE_READ_REG32(EQOS_MTL_BASE, EQOS_MTL_TXQ0_OPERATION_MODE);
+    mtl_tx_control |= EQOS_MTL_TXQ_TSF;
+  if (!eth.duplex_full)
+    mtl_tx_control |= EQOS_MTL_TXQ_FTQ;
+  AX_BASE_WRITE_REG32(EQOS_MTL_BASE, EQOS_MTL_TXQ0_OPERATION_MODE, mtl_tx_control);
+
+
+  /* Config MTL Rx Control*/
+  uint32_t mtl_rx_control = AX_BASE_READ_REG32(EQOS_MTL_BASE, EQOS_MTL_RXQ0_OPERATION_MODE);
+  mtl_rx_control |= EQOS_MTL_RXQ_RSF | EQOS_MTL_RXQ_DISTCPEF; //Receive Queue Store and Forward || Disable Dropping of TCP/IP Checksum Error Packets
+  AX_BASE_WRITE_REG32(EQOS_MTL_BASE, EQOS_MTL_RXQ0_OPERATION_MODE, mtl_rx_control);
+  /***************************************************** End MTL Config *****************************************************/
+
+
+
+
+  /***************************************************** MAC Config *****************************************************/
+  
+  /* MAC Config*/
+  // uint32_t mac_control = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
+  // printf("MAC Control: %x\n",mac_control);
+
+  // mac_control &= ~(EQOS_MAC_CFG_FES // Config speed
+  //                 | EQOS_MAC_CFG_DM  //duplex mode
+  //                 | EQOS_MAC_CFG_GPSLCE //Giant Packet Size Limit Control Enable
+  //                 | EQOS_MAC_CFG_WD // Watchdog Disable
+  //                 | EQOS_MAC_CFG_JD //Jabber Disable
+  //                 | EQOS_MAC_CFG_JE // Jumbo Packet Enable
+  //                 |EQOS_MAC_CFG_LM //Loopback Mode
+  //                 | EQOS_MAC_CFG_TE // Transmitter Enable
+  //                 | EQOS_MAC_CFG_RE); //Receiver Enable
+
+  /* MAC Packet Filter*/
+  uint32_t mac_filter = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER);
+  if (eth.cfg.promiscuous)
+    mac_filter |= EQOS_MAC_PKT_FILTER_PR; //Promiscuous Mode
+  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER, mac_filter);
+  /* MAC Address*/
+  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_ADDRESS0_HIGH,
+      ((uint32_t)eth.cfg.mac_addr[5] << 8) | eth.cfg.mac_addr[4]);
+  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_ADDRESS0_LOW,
+      ((uint32_t)eth.cfg.mac_addr[3] << 24) |
+      ((uint32_t)eth.cfg.mac_addr[2] << 16) |
+      ((uint32_t)eth.cfg.mac_addr[1] << 8) | eth.cfg.mac_addr[0]);
+
+  uint32_t mac_control=0;
+  mac_control |= EQOS_MAC_CFG_CST | EQOS_MAC_CFG_ACS; //RC stripping for Type packets || Automatic Pad or CRC Stripping
+  if (eth.speed == EQOS_SPEED_100)
+    mac_control |= EQOS_MAC_CFG_FES;
+  if (eth.duplex_full)
+    mac_control |= EQOS_MAC_CFG_DM;
+  if (eth.cfg.loopback)
+    mac_control |= EQOS_MAC_CFG_LM;
+  // AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION, mac_control);
+  //   mac_control = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
+  printf("MAC Control: %x\n",mac_control);
+  /* Start Tx And Rx*/
   AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION,
-      mac_control | EQOS_MAC_CFG_TE | EQOS_MAC_CFG_RE);
+                      mac_control //Apply mac config
+                      | EQOS_MAC_CFG_TE //Start transmit
+                      | EQOS_MAC_CFG_RE); //Start receive
+
+
+  /***************************************************** End MAC Config *****************************************************/
   eth.started = true;
   const uint8_t dest_mac[6] = {0x6C, 0x1F, 0xF7, 0xCA, 0x2B, 0xFD};
 //  const uint8_t payload[] = "Hello world hehe lmao";
-  const uint8_t payload[] = {0x17, 0x17, 0x17, 0x69, 0x29, 0x36};
+  const uint8_t payload[] = {0x17, 0x17, 0x17, 0x69, 0x29, 0x36,0x98,0x99};
   memcpy(frame, dest_mac, 6);
   memcpy(frame + 6, eth.cfg.mac_addr, 6);
   frame[12] = 0x88;
@@ -352,11 +382,11 @@ int main(void)
         tx->des2 = frame_len & EQOS_TDES2_B1L_MASK;
         __DSB();
         tx->des3 = EQOS_TDES3_OWN | EQOS_TDES3_FD | EQOS_TDES3_LD |
-                   (frame_len & EQOS_TDES3_FL_MASK);
+                   (frame_len & EQOS_TDES3_FL_MASK); // Mark descriptor as FD, LD , frame length and set OWN bit
         __DSB();
         eth.tx_head = (idx + 1U) & (EQOS_TX_DESC_COUNT - 1U);
         AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR,
-            (uint32_t)(uintptr_t)&tx_desc[eth.tx_head]);
+            (uint32_t)(uintptr_t)&tx_desc[eth.tx_head]); // Update Tail pointer
         elapsed = 0;
         uint32_t tx_result;
         do {

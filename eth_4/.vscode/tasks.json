@@ -1,0 +1,109 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "STM32: Build CM7",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/stm32.ps1",
+                "-Action",
+                "Build",
+                "-Core",
+                "CM7"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "STM32: Build CM4",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/stm32.ps1",
+                "-Action",
+                "Build",
+                "-Core",
+                "CM4"
+            ],
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "STM32: Build both cores",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/stm32.ps1",
+                "-Action",
+                "Build",
+                "-Core",
+                "All"
+            ],
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "STM32: Build and Flash CM7 (ST-LINK)",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/stm32.ps1",
+                "-Action",
+                "Flash",
+                "-Core",
+                "CM7"
+            ],
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "STM32: Build and Flash both cores (ST-LINK)",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/stm32.ps1",
+                "-Action",
+                "Flash",
+                "-Core",
+                "All"
+            ],
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "STM32: List ST-LINK probes",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/stm32.ps1",
+                "-Action",
+                "Probe"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

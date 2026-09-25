@@ -1,1 +1,79 @@
 .metadata/
+.cubeide-workspace/
+# ==============================
+# Build output
+# ==============================
+build/
+_build/
+cmake-build-*/
+
+# ==============================
+# CMake generated files
+# ==============================
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+compile_commands.json
+build.ninja
+.ninja_deps
+.ninja_log
+CMakeUserPresets.json
+
+# ==============================
+# Compiler / Linker output
+# ==============================
+*.o
+*.obj
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.su
+*.cyclo
+*.list
+
+# ==============================
+# Debug files
+# ==============================
+*.axf
+*.out
+
+# ==============================
+# VS Code
+# ==============================
+# Keep tasks, scripts, launch configurations and IntelliSense settings shared.
+.vscode/ipch/
+*.VC.db
+*.VC.db-shm
+*.VC.db-wal
+
+# ==============================
+# STM32CubeIDE generated files
+# ==============================
+Debug/
+Release/
+# Keep .project, .cproject, .ioc, .launch and project preferences in Git.
+# Only ignore regenerated compiler discovery and personal register-view state.
+**/.settings/language.settings.xml
+**/.settings/com.st.stm32cube.ide.mcu.sfrview.prefs
+
+# ==============================
+# Temporary / backup files
+# ==============================
+*.tmp
+*.temp
+*.bak
+*~
+*.swp
+*.swo
+
+# ==============================
+# OS files
+# ==============================
+.DS_Store
+Thumbs.db
+desktop.ini
