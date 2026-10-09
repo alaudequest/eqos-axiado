@@ -1,7 +1,7 @@
 param(
     [ValidateSet('Build', 'Flash', 'Probe')][string]$Action = 'Build',
     [ValidateSet('CM7', 'CM4', 'All')][string]$Core = 'CM7',
-    [string]$CubeIdePath = 'D:\Stm32IDE\STM32CubeIDE_1.19.0\STM32CubeIDE',
+    [string]$CubeIdePath = 'D:\STM32\STM32CubeIDE_1.19.0\STM32CubeIDE',
     [string]$SerialNumber = ''
 )
 $ErrorActionPreference = 'Stop'

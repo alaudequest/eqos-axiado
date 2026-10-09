@@ -1,4 +1,4 @@
-﻿{
+{
     "version":  4,
     "configurations":  [
                            {
@@ -9,12 +9,12 @@
                                                     "-mfloat-abi=hard"
                                                 ],
                                "includePath":  [
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\CM7\\Core\\Inc",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\BSP\\STM32H7xx_Nucleo",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Include"
+                                                   "${workspaceFolder}\\CM7\\Core\\Inc",
+                                                   "${workspaceFolder}\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
+                                                   "${workspaceFolder}\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
+                                                   "${workspaceFolder}\\Drivers\\BSP\\STM32H7xx_Nucleo",
+                                                   "${workspaceFolder}\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
+                                                   "${workspaceFolder}\\Drivers\\CMSIS\\Include"
                                                ],
                                "name":  "CM7",
                                "intelliSenseMode":  "gcc-arm",
@@ -38,11 +38,11 @@
                                                     "-mfloat-abi=hard"
                                                 ],
                                "includePath":  [
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\CM4\\Core\\Inc",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
-                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Include"
+                                                   "${workspaceFolder}\\CM4\\Core\\Inc",
+                                                   "${workspaceFolder}\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
+                                                   "${workspaceFolder}\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
+                                                   "${workspaceFolder}\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
+                                                   "${workspaceFolder}\\Drivers\\CMSIS\\Include"
                                                ],
                                "name":  "CM4",
                                "intelliSenseMode":  "gcc-arm",

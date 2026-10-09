@@ -82,5 +82,5 @@ desktop.ini
 /build-flash-cm7.cmd
 /build-flash-cm7.ps1
 /eth_3/build-flash-cm7.cmd
-/eth_4/build-flash-cm7.cmd
+/L0_MK_RMII_END2END_PC_TX/build-flash-cm7.cmd
 /L0_MK_RMII_MAC_LOOPBACK/build-flash-cm7.cmd

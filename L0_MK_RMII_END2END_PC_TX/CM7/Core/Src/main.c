@@ -33,15 +33,14 @@
  *   TX: application frame -> RAM TX buffer -> DMA -> MTL TX FIFO -> MAC -> RMII
  *   RX: RMII -> MAC -> MTL RX FIFO -> DMA -> RAM RX buffer -> application
  *
- * All AX_BASE_* calls take an ABSOLUTE block base and a RELATIVE byte offset:
- *   MAC: 0x40028000; MTL queue 0 window: 0x40028D00; DMA: 0x40029000.
- * Example: DMA_CH0_TX_CONTROL = 0x104 -> actual address 0x40029104.
  * The MTL base here selects queue 0, not the global MTL window at offset 0xC00.
  * eqos_hw.h includes generic EQoS definitions; not every generic feature is
  * implemented by the H755. This file uses its single 10/100-Mbit MAC and AHB DMA.
  *
  * CURRENT EXPERIMENTAL SEQUENCE -- these comments describe the code as saved:
- * - cfg.loopback is true; the LAN8742 initialization/link wait below is disabled.
+ * - The LAN8742 initialization/link wait is enabled for End2End transmit.
+ * - At PC end, use WireShark to capture the packet.
+ * - Re-send packet with pressing BLUE button B1.
  * - DMA ST/SR are set BEFORE descriptor initialization/list registration below.
  *   The usual bring-up order is reset -> configure while stopped -> prepare
  *   buffers/rings -> publish ring addresses -> start DMA/MAC. If early DMA
@@ -51,24 +50,24 @@
 COM_InitTypeDef BspCOMInit;
 static struct eqos_dev eth;
 static lan8742_Object_t LAN8742;
-/* eth records software state/statistics; it is not a hardware register overlay.
- * The EXTI callback sets this flag and main consumes it. volatile makes the ISR
- * update observable, but this is a one-bit request latch, not a counted queue. */
+/* Struct 'eth' records software state/statistics;
+ * The button trigger interrupt to set send_requested flag.
+*/
 static volatile uint8_t send_requested;
 static uint8_t frame[114];
 static uint32_t frame_len;
 
 /*
- * Normal descriptors occupy four 32-bit words (16 bytes). The SAME words have
- * different meanings in DMA read format (CPU submits work) and DMA write-back
- * format (hardware reports completion); never interpret RX status as an address.
+ * Normal descriptors occupy four 32-bit words (16 bytes). Descriptors have 
+ * 2 states: DMA read format (CPU prepared for DMA) and DMA write-back
+ * format (hardware reports completion); 
  *
- * This single-buffer, non-TSO application submits:
- *   TX DES0 = buffer-1 address; DES1 = 0 (no second buffer);
+ * The application submits:
+ *   TX DES0 = buffer_1 address; DES1 = 0 (no second buffer);
  *      DES2 = B1L, buffer byte count; DES3 = OWN | FD | LD | total frame length.
- *   RX DES0 = buffer-1 address; DES1/DES2 = 0 (unused);
+ *   RX DES0 = buffer_1 address; DES1/DES2 = 0 (unused);
  *      DES3 = OWN | BUF1V, making that buffer available for DMA reception.
- * After completion DES3 carries OWN=0 and write-back flags/length/error status.
+ * After DMA completed Tx or Rx, DES3 carries OWN=0 and write-back flags/length/error status.
  *
  * OWN=1: DMA owns the descriptor and associated buffer; CPU must not rewrite it.
  * OWN=0: CPU can inspect completion and later rebuild/reuse the descriptor.
@@ -79,16 +78,19 @@ struct eqos_desc {
 };
 /* Rings: 4 TX and 8 RX entries by current eqos.h defaults. The linker places
  * .eqos_nocache in DMA-accessible RAM_D1, with NOLOAD: initialize every word
- * explicitly below. A section NAME does not program the MPU/cache attributes.
- * Buffers are also in RAM_D1 (.bss), not DTCM, which this ETH DMA cannot access.
- * 32-byte alignment is the M7 cache-line alignment; descriptors remain packed
- * at a 16-byte stride inside each ring. DSL must therefore remain zero. */
+ * explicitly below. D-cached being disabled globally (code line 162).
+ * Buffers are also in RAM_D1 (.bss).
+ * 32-byte alignment is the M7 cache-line alignment; 
+ * Descriptors remain packed at a 16-byte stride inside each ring. DSL (Descriptor skip length) must therefore remain zero.
+ * DSl: extra space the DMA skips after a descriptor before reading the next one. Zero means descriptors are continuos.
+ */
 static struct eqos_desc tx_desc[EQOS_TX_DESC_COUNT]
   __attribute__((aligned(32), section(".eqos_nocache")));
 static struct eqos_desc rx_desc[EQOS_RX_DESC_COUNT]
   __attribute__((aligned(32), section(".eqos_nocache")));
 static uint8_t tx_buf[EQOS_TX_DESC_COUNT][EQOS_BUF_SIZE] __attribute__((aligned(32)));
 static uint8_t rx_buf[EQOS_RX_DESC_COUNT][EQOS_BUF_SIZE] __attribute__((aligned(32)));
+
 /* These checks protect assumptions in the DMA configuration and wrap logic:
  * index = (index + 1) & (count - 1) requires a nonzero power-of-two ring count.
  * RBSZ describes each RX buffer's capacity, not the Ethernet MTU or packet size.
@@ -112,9 +114,7 @@ static int32_t ETH_PHY_INTERFACE_ReadReg(uint32_t DevAddr, uint32_t RegAddr, uin
 static int32_t ETH_PHY_INTERFACE_WriteReg(uint32_t DevAddr, uint32_t RegAddr, uint32_t RegVal);
 static int32_t ETH_PHY_INTERFACE_GetTick(void);
 static int32_t ETH_PHY_INTERFACE_WaitIdle(void);
-/* Original LAN8742 component calls these MDIO/tick functions through its bus
- * context. They are presently unused by main because step 4 is commented out;
- * keep them available for a later external-PHY bring-up experiment. */
+/* Original LAN8742 component calls these MDIO/tick functions through its bus context.  */
 static lan8742_IOCtx_t LAN8742_IOCtx = {
   ETH_PHY_INTERFACE_Init, ETH_PHY_INTERFACE_DeInit,
   ETH_PHY_INTERFACE_WriteReg, ETH_PHY_INTERFACE_ReadReg, ETH_PHY_INTERFACE_GetTick
@@ -145,9 +145,7 @@ int main(void)
   /* csr_clk_hz is the MAC register/CSR clock used for MDC division and the
    * microsecond tick register; it is NOT the external 50 MHz RMII reference.
    * PR=true requests promiscuous reception, useful with the test's peer MAC.
-   * LM=true requests MAC-internal loopback later when MACCR is written.
-   * max_speed/aneg_timeout_ms do not take effect while the PHY sequence is
-   * disabled; no code in this initializer directly programs the LAN8742. */
+   */
   eth.cfg = (struct eqos_cfg) {
     .base = EQOS_BASE_ADDR,
     .csr_clk_hz = HAL_RCC_GetHCLKFreq(),
@@ -155,24 +153,21 @@ int main(void)
     .mac_addr = {0x00, 0x80, 0xE1, 0x00, 0x00, 0x00},
     .max_speed = 100,
     .promiscuous = true,
-    .loopback = true,
+    .loopback = false,
     .aneg_timeout_ms = 5000,
   };
   eth.base = eth.cfg.base;
   eth.desc_stride = sizeof(struct eqos_desc);
-  /* DMA and CPU share RAM without clean/invalidate operations in this example.
-   * Refuse D-cache-on execution rather than polling stale descriptor OWN bits
-   * or sending stale packet bytes. __DSB() alone cannot clean dirty cache lines. */
+  
+  /*Keep D-cache disabled for this test*/
   if ((SCB->CCR & SCB_CCR_DC_Msk) != 0U) {
     printf("Keep D-cache disabled for this DMA bring-up\r\n");
     Error_Handler();
   }
 
-  /* 2. DWT delay clock, Ethernet GPIO AF11, RMII selection and RCC reset. */
-  /* TRCENA enables access to the DWT cycle counter; LAR unlocks DWT on this core.
+  /* 2. DWT delay clock, Ethernet GPIO AF11, RMII selection and RCC reset. 
    * CYCCNT then counts CPU cycles for eqos_udelay(). Its conversion depends on
-   * SystemCoreClock being up to date. Debug halts make software timeouts longer
-   * in wall-clock time; the timeout loops are bring-up bounds, not hard timing. */
+   * SystemCoreClock being up to date. */
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->LAR = 0xC5ACCE55U;
   DWT->CYCCNT = 0U;
@@ -182,11 +177,6 @@ int main(void)
   RCC->APB4ENR |= RCC_APB4ENR_SYSCFGEN;
   (void)RCC->AHB4ENR;
   (void)RCC->APB4ENR;
-  /* Clock-enable readbacks above allow the RCC writes to take effect before
-   * accessing port registers. No PHY reset GPIO is configured in this sequence.
-   * PA1 must receive the board's RMII clock even when testing the MAC locally.
-   * All pins below use AF11, push-pull, no internal pulls and very-high speed;
-   * OSPEEDR controls output slew rate, not the Ethernet line-rate setting. */
   const struct { GPIO_TypeDef *port; uint32_t pin; } rmii_pins[] = {
     {GPIOA, 1}, {GPIOA, 2}, {GPIOA, 7}, /* REF_CLK, MDIO, CRS_DV */
     {GPIOC, 1}, {GPIOC, 4}, {GPIOC, 5}, /* MDC, RXD0, RXD1 */
@@ -195,9 +185,6 @@ int main(void)
   for (uint32_t i = 0; i < sizeof(rmii_pins) / sizeof(rmii_pins[0]); ++i) {
     GPIO_TypeDef *gpio = rmii_pins[i].port;
     uint32_t pin = rmii_pins[i].pin;
-    /* MODER/PUPDR/OSPEEDR allocate two bits per pin; AFR allocates four.
-     * pin/8 selects AFRL or AFRH and pin%8 selects the nibble within that word.
-     * Set the alternate-function selection before switching MODER to AF mode. */
     uint32_t shift = pin * 2U;
     uint32_t af_shift = (pin % 8U) * 4U;
     gpio->OTYPER &= ~(1U << pin);
@@ -224,12 +211,12 @@ int main(void)
   NVIC_ClearPendingIRQ(ETH_IRQn);
   eqos_udelay(10);
 
-  /* 3. MAC/DMA software reset. External PA1 REF_CLK must be running. */
+  //Check MAC version
   printf("MAC version: %08lX\r\n", (unsigned long)AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_VERSION));
-  /* SWR requests a reset of the EQoS DMA/controller state and self-clears when
-   * complete. The loop must reread the volatile register; a saved snapshot
-   * cannot tell us when hardware has finished. Missing interface clocks can
-   * leave SWR set. Do not program rings/MAC settings until this wait succeeds. */
+  
+  /* 3. MAC/DMA software reset. 
+   * SWR requests a reset of the EQoS DMA/controller state and self-clears when
+   * complete. The loop must reread the volatile register; Do not program rings/MAC settings until this wait succeeds. */
   uint32_t dma_mode = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_MODE);
   dma_mode |= EQOS_DMA_MODE_SWR;
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_MODE, dma_mode);
@@ -241,14 +228,15 @@ int main(void)
     }
     eqos_udelay(1);
   }
+
   /* Program clocks-per-microsecond minus one for the MAC's internal tick.
    * With this project's HCLK=224 MHz the value is 223. This is unrelated to
    * the IEEE 1588 timestamp increment and does not enable PTP timestamping. */
   AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_US_TIC_COUNTER,
       eth.cfg.csr_clk_hz / 1000000U - 1U);
+
   /* CR selects an MDC divider for Clause-22 PHY management transactions.
-   * The MDIO callbacks insert eth.mdio_cr into MACMDIOAR for every operation;
-   * the numeric CR code is an encoding, not the divisor itself.
+   * The MDIO callbacks insert eth.mdio_cr into MAC_MDIO_Address for every operation;
    * With 224 MHz HCLK this branch selects the 150-250 MHz clock range.
    * Speed/duplex negotiation is separate from this management-bus clock. */
   uint32_t hz = eth.cfg.csr_clk_hz;
@@ -263,76 +251,73 @@ int main(void)
     Error_Handler();
   }
 
-  /* PHY bring-up outline (currently DISABLED by // on each statement):
+  /* PHY bring-up outline 
    * RegisterBusIO binds the callbacks; Init scans the PHY address, requests
    * software reset and waits for settling; StartAutoNego enables negotiation.
    * GetLinkState returns named status codes, not a speed in Mbit/s. Only the
    * four 10/100 half/full-duplex cases assign a usable eth.speed/duplex_full.
    * LINK_DOWN and AUTONEGO_NOTDONE require waiting, not starting the MAC.
-   * The component's own reset/settle delays precede the separate 5-second wait.
-   * MAC loopback does not automatically restore this disabled PHY sequence. */
+   */
+
   /* 4. Original LAN8742 driver via direct-register MDIO callbacks. */
-//  int32_t status = LAN8742_RegisterBusIO(&LAN8742, &LAN8742_IOCtx);
-//  if (status == LAN8742_STATUS_OK)
-//    status = LAN8742_Init(&LAN8742);
-//  if (status == LAN8742_STATUS_OK)
-//    status = LAN8742_StartAutoNego(&LAN8742);
-//  if (status != LAN8742_STATUS_OK) {
-//    printf("LAN8742 init failed: %ld\r\n", (long)status);
-//    Error_Handler();
-//  }
-//  eth.phy_addr = (int)LAN8742.DevAddr;
-//  uint32_t start = HAL_GetTick();
-//  while (!eth.link_up) {
-//    status = LAN8742_GetLinkState(&LAN8742);
-//    switch (status) {
-//    case LAN8742_STATUS_100MBITS_FULLDUPLEX:
-//    case LAN8742_STATUS_100MBITS_HALFDUPLEX:
-//      eth.speed = EQOS_SPEED_100;
-//      eth.duplex_full = (status == LAN8742_STATUS_100MBITS_FULLDUPLEX);
-//      eth.link_up = true;
-//      break;
-//    case LAN8742_STATUS_10MBITS_FULLDUPLEX:
-//    case LAN8742_STATUS_10MBITS_HALFDUPLEX:
-//      eth.speed = EQOS_SPEED_10;
-//      eth.duplex_full = (status == LAN8742_STATUS_10MBITS_FULLDUPLEX);
-//      eth.link_up = true;
-//      break;
-//    case LAN8742_STATUS_LINK_DOWN:
-//    case LAN8742_STATUS_AUTONEGO_NOTDONE:
-//      break;
-//    default:
-//      printf("LAN8742 link read failed: %ld\r\n", (long)status);
-//      Error_Handler();
-//    }
-//    if (!eth.link_up) {
-//      if ((uint32_t)(HAL_GetTick() - start) >= eth.cfg.aneg_timeout_ms) {
-//        printf("LAN8742 link timeout: %ld\r\n", (long)status);
-//        Error_Handler();
-//      }
-//      HAL_Delay(10);
-//    }
-//  }
+ int32_t status = LAN8742_RegisterBusIO(&LAN8742, &LAN8742_IOCtx);
+ if (status == LAN8742_STATUS_OK)
+   status = LAN8742_Init(&LAN8742);
+ if (status == LAN8742_STATUS_OK)
+   status = LAN8742_StartAutoNego(&LAN8742);
+ if (status != LAN8742_STATUS_OK) {
+   printf("LAN8742 init failed: %ld\r\n", (long)status);
+   Error_Handler();
+ }
+ eth.phy_addr = (int)LAN8742.DevAddr;
+ uint32_t start = HAL_GetTick();
+ while (!eth.link_up) {
+   status = LAN8742_GetLinkState(&LAN8742);
+   switch (status) {
+   case LAN8742_STATUS_100MBITS_FULLDUPLEX:
+   case LAN8742_STATUS_100MBITS_HALFDUPLEX:
+     eth.speed = EQOS_SPEED_100;
+     eth.duplex_full = (status == LAN8742_STATUS_100MBITS_FULLDUPLEX);
+     eth.link_up = true;
+     break;
+   case LAN8742_STATUS_10MBITS_FULLDUPLEX:
+   case LAN8742_STATUS_10MBITS_HALFDUPLEX:
+     eth.speed = EQOS_SPEED_10;
+     eth.duplex_full = (status == LAN8742_STATUS_10MBITS_FULLDUPLEX);
+     eth.link_up = true;
+     break;
+   case LAN8742_STATUS_LINK_DOWN:
+   case LAN8742_STATUS_AUTONEGO_NOTDONE:
+     break;
+   default:
+     printf("LAN8742 link read failed: %ld\r\n", (long)status);
+     Error_Handler();
+   }
+   if (!eth.link_up) {
+     if ((uint32_t)(HAL_GetTick() - start) >= eth.cfg.aneg_timeout_ms) {
+       printf("LAN8742 link timeout: %ld\r\n", (long)status);
+       Error_Handler();
+     }
+     HAL_Delay(10);
+   }
+ }
   printf("PHY %d: %d Mbps %s duplex\r\n", eth.phy_addr, (int)eth.speed,
          eth.duplex_full ? "full" : "half");
 
   /* 5. Configure the DMA, then MTL, then MAC blocks (current source order).
    * Register snapshots below are local read/modify/write values. Combine bits
-   * before writing to avoid redundant bus accesses, but continue fresh reads
+   * before writing to avoid access bus many times, but continue fresh reads
    * for hardware status polling. OR-ing a multi-bit field is not equivalent
    * to replacing it unless the old field bits are known to be zero. */
 
-
-
   /***************************************************** DMA Config *****************************************************/
   /* DMA channel-0 TX control (DMA base + 0x104):
-   * OSP allows processing the next packet while the previous packet completes.
-   * TXPBL is a programmable burst-length field, in bus beats, not bytes.
+   * OSP (Operate on second packets) allows processing the next packet while the previous packet completes.
+   * TXPBL (Tx programmable burst-length) is a programmable burst-length field, in bus beats, not bytes.
    * With TXPBL=8 and PBLX8=1 below, the configured limit is 8*8=64 beats
    * (256 bytes on a 32-bit bus); actual transfers can be shorter/split.
-   * ST starts TX DMA. Here it is set before the TX ring base/length are written.
-   * The field-clear code is commented out: OR-ing 8 relies on the reset value
-   * for TXPBL. A repeated configuration without reset could retain other bits. */
+   * ST bit (Start transmit) starts TX DMA. Here it is set before the TX ring base/length are written.
+   */
   uint32_t tx_dma_control = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL);
   // tx_dma_control &= ~((EQOS_DMA_CH_TX_TXPBL_MASK << EQOS_DMA_CH_TX_TXPBL_SHIFT) |
   //                     EQOS_DMA_CH_TX_ST); //Transmit Programmable Burst Length
@@ -355,23 +340,22 @@ int main(void)
   rx_dma_control |= (EQOS_BUF_SIZE << EQOS_DMA_CH_RX_RBSZ_SHIFT)  //Receive Buffer size
                   | (8U << EQOS_DMA_CH_RX_RXPBL_SHIFT) //Receive Programmable Burst Length
                   | EQOS_DMA_CH_RX_SR; //Start or Stop Receive
-
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL,rx_dma_control);
+
   /* DMA channel control (DMA base + 0x100):
    * PBLX8 multiplies both burst-length fields by eight. It does NOT select DSL.
    * DSL is the number of bus-width units skipped after each 16-byte descriptor.
-   * This packed array needs DSL=0. Since the explicit DSL clear is disabled,
-   * the current code relies on the successful SWR reset leaving DSL at zero. */
+   * This packed array needs DSL=0.*/
   uint32_t dma_control = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL);
    
   // dma_control &= ~(EQOS_DMA_CH_CTRL_DSL_MASK << EQOS_DMA_CH_CTRL_DSL_SHIFT);
   dma_control |= EQOS_DMA_CH_CTRL_PBLX8; /* Scale PBL by 8; DSL is unchanged here. */
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL,dma_control);
+
   /* AHB system-bus mode: AAL requests address-aligned bursts; FB selects fixed
    * burst behavior. H755 uses the AHB variant: generic EQoS AXI BLEN/EAME fields
-   * must not be substituted here. This whole-register write intentionally sets
-   * the configured bits and leaves the other writable controls clear.
-   * DMACIER=0 selects polling; it does not clear DMACSR or stop DMA transfers. */
+   * must not be substituted here.  
+   * DMACIER (DMA channel interrupt enable)=0 selects polling; it does not clear DMACSR or stop DMA transfers. */
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_SYSBUS_MODE,
                         EQOS_DMA_SYSBUS_AHB_AAL //Address-Aligned Beats
                         | EQOS_DMA_SYSBUS_AHB_FB); //  Fixed Burst Length
@@ -379,12 +363,10 @@ int main(void)
 
   /* 7. Initialize TX/RX descriptors and register both rings with DMA. */
   /* TX initially has no work: OWN=0 in every descriptor. RX starts pre-posted:
-   * each descriptor advertises a dedicated empty buffer with BUF1V and OWN.
-   * CPU writes address/unused words first, executes DSB, then publishes OWN.
-   * A second barrier after the loop completes publication before MMIO ring
-   * registration. The CPU must not modify an RX buffer after giving OWN away.
-   * Debug sequence note: ST/SR were already set above; these writes have not
-   * stopped the engines, so the usual stopped-DMA setup ordering is not met. */
+   * each descriptor point to address of their empty buffer with BUF1V and OWN.
+   * CPU writes address/unused words first, executes DSB, then set OWN bit.
+   * The CPU must not modify an RX buffer after giving OWN away.
+   * Debug sequence note: ST/SR were already set above;  */
   for (uint32_t i = 0; i < EQOS_TX_DESC_COUNT; ++i) {
     tx_desc[i].des0 = 0;
     tx_desc[i].des1 = 0;
@@ -399,12 +381,19 @@ int main(void)
     rx_desc[i].des3 = EQOS_RDES3_OWN | EQOS_RDES3_BUF1V;
   }
   __DSB();
-  /* List-address registers hold absolute RAM addresses, NOT EQoS block offsets.
-   * Ring length is encoded N-1: current TX=4 -> 3, RX=8 -> 7.
-   * DMA walks the array using the 16-byte descriptor plus DSL skip; it does not
-   * use the software eth.tx_head/rx_head variables to find the next descriptor.
-   * Tail registers are published work boundaries/resume notifications, not
-   * payload pointers. OWN, ring bounds and the tail must agree. */
+
+  /* Tell DMA where each descriptor array starts in RAM: &tx_desc[0] and
+   * &rx_desc[0]. Write the full RAM address; do not subtract the EQoS base.
+   * Write descriptor count minus 1 into each ring-length register:
+   * 4 TX descriptors -> write 3; 8 RX descriptors -> write 7.
+   * DMA moves to the next descriptor by adding 16 bytes plus any DSL gap.
+   * Here DSL=0, so descriptors are 16 bytes apart. DMA wraps to the start
+   * after the last descriptor. tx_head/rx_head are only for our C code;
+   * DMA tracks its own position.
+   * The tail tells DMA where the available work ends. Updating it can
+   * restart DMA after it has stopped there. It refers to descriptors,
+   * not packet data. Set OWN=1 to give a descriptor to DMA, and keep the
+   * tail address and ring size consistent with the descriptors in use. */
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_LIST_ADDR,
       (uint32_t)(uintptr_t)&tx_desc[0]); //Tx List Address
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_RING_LEN,
@@ -415,19 +404,17 @@ int main(void)
       EQOS_RX_DESC_COUNT - 1U);  //Rx Ring length
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR,
       (uint32_t)(uintptr_t)&tx_desc[0]); //Tx Tail Pointer
-  /* Preserve the supplied driver's last-descriptor RX tail convention:
-   * initial tail=&rx_desc[N-1]; recycling later writes the returned descriptor's
-   * address. Do not silently substitute a one-past-end convention from another
-   * EQoS driver. On a stall, inspect OWN, current RX descriptor and tail together;
+  
+  /* Setting tail Rx Desc tail pointer: initial tail=&rx_desc[N-1];
+   * recycling later writes the returned descriptor's address.
+   * On a stall, inspect OWN, current RX descriptor and tail together;
    * exercise more than N packets to verify wraparound on the actual hardware. */
   AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_TAIL_PTR,
       (uint32_t)(uintptr_t)&rx_desc[EQOS_RX_DESC_COUNT - 1U]);//Rx Tail Pointer
   eth.tx_head = 0;
   eth.rx_head = 0;
 
-
   
-
   /***************************************************** End DMA Config *****************************************************/
 
 
@@ -435,7 +422,7 @@ int main(void)
   /* MTL TX queue 0 (MTL queue base + 0x00):
    * TSF selects store-and-forward: accumulate the full frame before passing it
    * to the MAC, reducing underrun risk compared with threshold-based forwarding.
-   * FTQ requests a FIFO flush and is a command that hardware clears; it is not
+   * FTQ(Flush transmit queue) requests a FIFO flush and is a command that hardware clears; it is not
    * a persistent operating-mode flag. Do not reuse a stale FTQ=1 snapshot later.
    * The condition currently takes the half-duplex branch because PHY assignment
    * is disabled and eth.duplex_full remains false. No TX is submitted yet. */
@@ -462,32 +449,18 @@ int main(void)
 
   /***************************************************** MAC Config *****************************************************/
   
-  /* MAC configuration is assembled below and committed with TE/RE in one write.
-   * The old read/clear sequence is left commented out. The ACTIVE path starts
-   * mac_control at zero, so unlisted writable features are intentionally clear;
-   * it does not preserve previously programmed MAC control bits. */
-  // uint32_t mac_control = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
-  // printf("MAC Control: %x\n",mac_control);
+  /* MAC configuration is assembled below and committed with TE/RE in one write.*/
 
-  // mac_control &= ~(EQOS_MAC_CFG_FES // Config speed
-  //                 | EQOS_MAC_CFG_DM  //duplex mode
-  //                 | EQOS_MAC_CFG_GPSLCE //Giant Packet Size Limit Control Enable
-  //                 | EQOS_MAC_CFG_WD // Watchdog Disable
-  //                 | EQOS_MAC_CFG_JD //Jabber Disable
-  //                 | EQOS_MAC_CFG_JE // Jumbo Packet Enable
-  //                 |EQOS_MAC_CFG_LM //Loopback Mode
-  //                 | EQOS_MAC_CFG_TE // Transmitter Enable
-  //                 | EQOS_MAC_CFG_RE); //Receiver Enable
-
-  /* MAC packet filter PR accepts frames irrespective of destination-address
+  /* MAC packet filter PR(Promiscuous) accepts frames irrespective of destination-address
    * matching, useful because the test destination differs from this MAC address.
    * Promiscuous mode is not a bypass for every integrity/error check.
-   * Current code only ORs PR when true; false does not explicitly clear an
-   * already-set PR bit, so this branch relies on reset state for false. */
+   * Current code only || PR when true at struct eqos_cfg ; false does not explicitly clear an
+   * already-set PR bit, so cycle board when change struct eqos_cfg parameter.*/
   uint32_t mac_filter = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER);
   if (eth.cfg.promiscuous)
     mac_filter |= EQOS_MAC_PKT_FILTER_PR; //Promiscuous Mode
   AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER, mac_filter);
+
   /* Program perfect-filter address slot 0, byte by byte into its register words.
    * For 00:80:E1:00:00:00 this gives HIGH=0x00000000 and LOW=0x00E18000.
    * The packing is register byte order, not a reversal of bytes in the frame.
@@ -499,7 +472,7 @@ int main(void)
       ((uint32_t)eth.cfg.mac_addr[2] << 16) |
       ((uint32_t)eth.cfg.mac_addr[1] << 8) | eth.cfg.mac_addr[0]);
 
-  /* MACCR fields used by this experiment:
+  /* MAC_Configuration fields used by this experiment:
    * CST/ACS control receive FCS/padding stripping according to frame Type/Length.
    * They do not describe TX CRC insertion. With EtherType 0x88B5 there is no
    * length field telling the MAC that the custom payload is only eight bytes;
@@ -518,9 +491,8 @@ int main(void)
     mac_control |= EQOS_MAC_CFG_DM;
   if (eth.cfg.loopback)
     mac_control |= EQOS_MAC_CFG_LM;
-  // AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION, mac_control);
-  //   mac_control = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
-  printf("MAC Control: %x\n",mac_control);
+  printf("MAC Control: %lx\n",mac_control);
+  
   /* TE and RE enable the MAC transmitter and receiver. These are independent
    * of DMA ST/SR: both sides of the pipeline must be active for frame movement.
    * Ring registration and MTL configuration have completed by this point.
@@ -532,7 +504,10 @@ int main(void)
 
 
   /***************************************************** End MAC Config *****************************************************/
+ 
+  //Set software flag.
   eth.started = true;
+
   /* Raw Ethernet-II frame: 6 destination bytes + 6 source bytes + 2 EtherType
    * bytes + payload. 88 B5 is stored in network byte order; no IP header follows.
    * Current payload has eight literal bytes, so frame_len=22 (no trailing NUL).
@@ -552,12 +527,13 @@ int main(void)
   printf("Ethernet ready\r\n");
 
   while (1) {
-    /* 9. TX: copy, publish descriptor, advance tail, wait for completion. */
+    /* 9. TX: copy packet frame to tx_buf, publish descriptor, 
+          increase tail pointer, wait for completion. */
     if (send_requested != 0U) {
       send_requested = 0U;
       uint32_t idx = eth.tx_head;
-      /* tx_head names the next software slot to submit. The DMA has its own
-       * current-descriptor pointer. After a timeout the old slot may still be
+      /* tx_head stored the next descriptor to send in Tx process (for software-side easier monitor). 
+       * The DMA has its own current-descriptor pointer. After a timeout the old slot may still be
        * owned by DMA; the OWN check below prevents unsafe reuse on ring wrap. */
       struct eqos_desc *tx = &tx_desc[idx];
       int tx_status = EQOS_OK;
@@ -566,7 +542,7 @@ int main(void)
       } else if ((tx->des3 & EQOS_TDES3_OWN) != 0U) {
         tx_status = EQOS_EAGAIN; /* Never overwrite a buffer still owned by DMA. */
       } else {
-        /* Copy into persistent, DMA-accessible RAM before publishing ownership.
+        /* Copy into DMA-accessible RAM before publishing ownership.
          * DES0 points to the packet, DES1 is unused, and DES2.B1L equals the
          * number of valid bytes in that buffer. No interrupt-on-completion bit
          * is requested; completion is observed by polling DES3. */
@@ -575,7 +551,7 @@ int main(void)
         tx->des1 = 0;
         tx->des2 = frame_len & EQOS_TDES2_B1L_MASK;
         __DSB();
-        /* One packet fits in one descriptor: FD and LD are both set.
+        /* One packet fits in one descriptor: FD(First descriptor) and LD(Last descriptor) are both set.
          * FL is the total submitted frame length excluding generated FCS/pad.
          * CTXT=0 means normal descriptor; CIC=0 disables IP checksum insertion;
          * CPC=0 requests CRC and pad insertion in the H755 TX descriptor format.
@@ -584,7 +560,7 @@ int main(void)
         tx->des3 = EQOS_TDES3_OWN | EQOS_TDES3_FD | EQOS_TDES3_LD |
                    (frame_len & EQOS_TDES3_FL_MASK); // Mark descriptor as FD, LD , frame length and set OWN bit
         __DSB();
-        /* Advance modulo the power-of-two ring size. TX tail points at the
+        /* Increse the tx_head to the next descriptor to process. TX tail points at the
          * NEXT descriptor: this submits the preceding owned descriptor.
          * Tail advancement is necessary even if the descriptor is already OWN=1
          * when the engine is suspended at its previous work boundary. */
@@ -605,8 +581,7 @@ int main(void)
         } while (++elapsed < 1000000U);
         /* Timeout does not cancel DMA or give ownership back to the CPU.
          * ES means hardware completed with an error; otherwise count local TX
-         * completion. Success is not a peer acknowledgement or cable test,
-         * especially with MAC-internal loopback enabled. */
+         * completion.*/
         if ((tx_result & EQOS_TDES3_OWN) != 0U) {
           ++eth.stats.tx_timeouts;
           tx_status = EQOS_ETIMEDOUT;
@@ -620,23 +595,40 @@ int main(void)
       printf("TX: %s (%d), %lu bytes before padding/FCS\r\n",
              tx_status == EQOS_OK ? "complete" : "failed", tx_status,
              (unsigned long)frame_len);
+      /* MMC counters count packets, not status bits. Read each counter once.
+       * STM32H755 reserves 0x718; only generic EQoS targets may expose it.
+       * Counts depend on MMC reset/reset-on-read settings. */
+#if EQOS_STM32H7
+      printf("Tx_Packet_Count_Good_bad [0x718]: unsupported on STM32H755 (reserved)\r\n");
+#else
+      uint32_t tx_count_good_bad = AX_BASE_READ_REG32(EQOS_MAC_BASE, 0x718U);
+      printf("Tx_Packet_Count_Good_bad [0x718] = 0x%08lX (%lu): good + bad TX packets\r\n",
+             (unsigned long)tx_count_good_bad, (unsigned long)tx_count_good_bad);
+#endif
+      uint32_t tx_count_good = AX_BASE_READ_REG32(EQOS_MAC_BASE, 0x768U);
+      printf("Tx_Packet_Count_Good [0x768] = 0x%08lX (%lu): TX packets without errors\r\n",
+             (unsigned long)tx_count_good, (unsigned long)tx_count_good);
       if (tx_status != EQOS_OK)
         printf("DMACSR=%08lX TXDESC3=%08lX TXTAIL=%08lX\r\n",
                (unsigned long)AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_STATUS), (unsigned long)tx->des3,
                (unsigned long)AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR));
     }
 
-    /* 10. RX: poll ownership, validate, print, then rearm the same descriptor. */
+    /* 10. RX: polling for bit OWN set, check write-back Descriptor status,
+           print, then reset that Descriptor to give back DMA.*/
+
+    //rx_head stored the next descriptor to receive in Rx process
     uint32_t idx = eth.rx_head;
     struct eqos_desc *rx = &rx_desc[idx];
+
     /* Read a fresh volatile status for the current RX head on each main-loop
      * iteration. OWN=1 means no CPU-owned packet at this slot yet; no release
      * or head advancement is allowed in that case. Poll the ring in order. */
     uint32_t rx_status = rx->des3;
     if ((rx_status & EQOS_RDES3_OWN) == 0U) {
       __DSB(); /* Acquire packet bytes after DMA returns ownership. */
-      /* OWN=0 switches interpretation to RX write-back format.
-       * CTXT describes metadata rather than a normal data packet.
+      /* OWN=0 mean Descriptor switches to RX write-back format.
+       * CTXT is "Context type descriptor", not the "Normal" one.
        * ES summarizes receive errors. FD|LD must both be present because this
        * application cannot assemble frames spanning multiple descriptors.
        * PL is the hardware-reported length after applicable MAC stripping;
@@ -668,10 +660,19 @@ int main(void)
         }
         printf("\r\n");
       }
-      /* Both successful and discarded descriptors return to DMA exactly once. */
-      /* Rebuild ALL four words: DMA write-back may have overwritten address
+      uint32_t rx_count_error_crc = AX_BASE_READ_REG32(EQOS_MAC_BASE, 0x794U);
+      printf("Rx_CRC_Error_Count [0x794] = 0x%08lX (%lu): RX packets with CRC errors\r\n",
+             (unsigned long)rx_count_error_crc, (unsigned long)rx_count_error_crc);
+
+
+      uint32_t rx_count_good_unicast = AX_BASE_READ_REG32(EQOS_MAC_BASE, 0x7C4U);
+      printf("Rx_Unicast_Packet_Count_Good [0x7C4] = 0x%08lX (%lu): RX unicast Good packets.\r\n",
+             (unsigned long)rx_count_good_unicast, (unsigned long)rx_count_good_unicast);
+
+      /* Both successful and discarded descriptors return to DMA same time */
+      /* Rebuild ALL four words(des0:3): DMA write-back may have overwritten address
        * fields with status. Returning only OWN would resubmit invalid contents.
-       * Rearm even rejected/error/context descriptors so one bad frame does not
+       * Reset even rejected/error/context descriptors so one bad frame does not
        * permanently consume a ring entry. Do not access rx_buf[idx] after OWN.
        * DSB then tail write makes the rearmed descriptor visible before DMA is
        * notified; software advances rx_head only after returning this slot. */

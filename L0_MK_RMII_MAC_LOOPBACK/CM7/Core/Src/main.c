@@ -220,6 +220,12 @@ int main(void)
     eqos_udelay(1);
   }
 
+  /* Program clocks-per-microsecond minus one for the MAC's internal tick.
+   * With this project's HCLK=224 MHz the value is 223. This is unrelated to
+   * the IEEE 1588 timestamp increment and does not enable PTP timestamping. */
+  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_US_TIC_COUNTER,
+      eth.cfg.csr_clk_hz / 1000000U - 1U);
+
   /* 5. Configure the DMA, then MTL, then MAC blocks (current source order).
    * Register snapshots below are local read/modify/write values. Combine bits
    * before writing to avoid access bus many times, but continue fresh reads
