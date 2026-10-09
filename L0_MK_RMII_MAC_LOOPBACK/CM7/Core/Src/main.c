@@ -443,12 +443,13 @@ int main(void)
   printf("Ethernet ready\r\n");
 
   while (1) {
-    /* 9. TX: copy, publish descriptor, advance tail, wait for completion. */
+    /* 9. TX: copy packet frame to tx_buf, publish descriptor, 
+          increase tail pointer, wait for completion. */
     if (send_requested != 0U) {
       send_requested = 0U;
       uint32_t idx = eth.tx_head;
-      /* tx_head names the next software slot to submit. The DMA has its own
-       * current-descriptor pointer. After a timeout the old slot may still be
+      /* tx_head stored the next descriptor to send in Tx process (for software-side easier monitor). 
+       * The DMA has its own current-descriptor pointer. After a timeout the old slot may still be
        * owned by DMA; the OWN check below prevents unsafe reuse on ring wrap. */
       struct eqos_desc *tx = &tx_desc[idx];
       int tx_status = EQOS_OK;
@@ -457,7 +458,7 @@ int main(void)
       } else if ((tx->des3 & EQOS_TDES3_OWN) != 0U) {
         tx_status = EQOS_EAGAIN; /* Never overwrite a buffer still owned by DMA. */
       } else {
-        /* Copy into persistent, DMA-accessible RAM before publishing ownership.
+        /* Copy into DMA-accessible RAM before publishing ownership.
          * DES0 points to the packet, DES1 is unused, and DES2.B1L equals the
          * number of valid bytes in that buffer. No interrupt-on-completion bit
          * is requested; completion is observed by polling DES3. */
@@ -475,7 +476,7 @@ int main(void)
         tx->des3 = EQOS_TDES3_OWN | EQOS_TDES3_FD | EQOS_TDES3_LD |
                    (frame_len & EQOS_TDES3_FL_MASK); // Mark descriptor as FD, LD , frame length and set OWN bit
         __DSB();
-        /* Advance modulo the power-of-two ring size. TX tail points at the
+        /* Increse the tx_head to the next descriptor to process. TX tail points at the
          * NEXT descriptor: this submits the preceding owned descriptor.
          * Tail advancement is necessary even if the descriptor is already OWN=1
          * when the engine is suspended at its previous work boundary. */
@@ -531,17 +532,21 @@ int main(void)
                (unsigned long)AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR));
     }
 
-    /* 10. RX: poll ownership, validate, print, then rearm the same descriptor. */
+    /* 10. RX: polling for bit OWN set, check write-back Descriptor status,
+           print, then reset that Descriptor to give back DMA.*/
+
+    //rx_head stored the next descriptor to receive in Rx process
     uint32_t idx = eth.rx_head;
     struct eqos_desc *rx = &rx_desc[idx];
+
     /* Read a fresh volatile status for the current RX head on each main-loop
      * iteration. OWN=1 means no CPU-owned packet at this slot yet; no release
      * or head advancement is allowed in that case. Poll the ring in order. */
     uint32_t rx_status = rx->des3;
     if ((rx_status & EQOS_RDES3_OWN) == 0U) {
       __DSB(); /* Acquire packet bytes after DMA returns ownership. */
-      /* OWN=0 switches interpretation to RX write-back format.
-       * CTXT describes metadata rather than a normal data packet.
+      /* OWN=0 mean Descriptor switches to RX write-back format.
+       * CTXT is "Context type descriptor", not the "Normal" one.
        * ES summarizes receive errors. FD|LD must both be present because this
        * application cannot assemble frames spanning multiple descriptors.
        * PL is the hardware-reported length after applicable MAC stripping;
@@ -573,10 +578,10 @@ int main(void)
         }
         printf("\r\n");
       }
-      /* Both successful and discarded descriptors return to DMA exactly once. */
-      /* Rebuild ALL four words: DMA write-back may have overwritten address
+      /* Both successful and discarded descriptors return to DMA same time */
+      /* Rebuild ALL four words(des0:3): DMA write-back may have overwritten address
        * fields with status. Returning only OWN would resubmit invalid contents.
-       * Rearm even rejected/error/context descriptors so one bad frame does not
+       * Reset even rejected/error/context descriptors so one bad frame does not
        * permanently consume a ring entry. Do not access rx_buf[idx] after OWN.
        * DSB then tail write makes the rearmed descriptor visible before DMA is
        * notified; software advances rx_head only after returning this slot. */

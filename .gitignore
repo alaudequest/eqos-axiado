@@ -77,3 +77,10 @@ Release/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local build and flash command launchers
+/build-flash-cm7.cmd
+/build-flash-cm7.ps1
+/eth_3/build-flash-cm7.cmd
+/eth_4/build-flash-cm7.cmd
+/L0_MK_RMII_MAC_LOOPBACK/build-flash-cm7.cmd
