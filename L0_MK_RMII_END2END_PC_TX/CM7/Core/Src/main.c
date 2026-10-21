@@ -598,13 +598,6 @@ int main(void)
       /* MMC counters count packets, not status bits. Read each counter once.
        * STM32H755 reserves 0x718; only generic EQoS targets may expose it.
        * Counts depend on MMC reset/reset-on-read settings. */
-#if EQOS_STM32H7
-      printf("Tx_Packet_Count_Good_bad [0x718]: unsupported on STM32H755 (reserved)\r\n");
-#else
-      uint32_t tx_count_good_bad = AX_BASE_READ_REG32(EQOS_MAC_BASE, 0x718U);
-      printf("Tx_Packet_Count_Good_bad [0x718] = 0x%08lX (%lu): good + bad TX packets\r\n",
-             (unsigned long)tx_count_good_bad, (unsigned long)tx_count_good_bad);
-#endif
       uint32_t tx_count_good = AX_BASE_READ_REG32(EQOS_MAC_BASE, 0x768U);
       printf("Tx_Packet_Count_Good [0x768] = 0x%08lX (%lu): TX packets without errors\r\n",
              (unsigned long)tx_count_good, (unsigned long)tx_count_good);

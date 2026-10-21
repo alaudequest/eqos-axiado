@@ -78,10 +78,9 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-                        <entry excluding="example_main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="baremetal"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Common"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
+						<entry excluding="example_main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="baremetal"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -160,10 +159,9 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-                        <entry excluding="example_main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="baremetal"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Common"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
+						<entry excluding="example_main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="baremetal"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
