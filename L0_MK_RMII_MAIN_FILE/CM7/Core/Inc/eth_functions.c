@@ -288,6 +288,7 @@ int eth_rx_frame_receive(struct eqos_dev *eth, struct eqos_desc *rx_desc,
                 const uint32_t pl = rdes3 & EQOS_RDES3_WB_PL_MASK;
                 chunk = (pl > rx_bytes) ? pl - rx_bytes : 0U;
                 info->len   = pl;
+                info->rdes0 = desc->des0;       /* read status before re-arm */
                 info->rdes1 = desc->des1;       /* read status before re-arm */
                 info->rdes2 = desc->des2;
                 info->rdes3 = rdes3;
@@ -392,6 +393,87 @@ int eth_tx_frame_send(struct eqos_dev *eth, struct eqos_desc *tx_desc,
     if (!eth_desc_wait_own(&tx_desc[last_idx], timeout_us, &tdes3))
         return EQOS_ETIMEDOUT;
     info->tdes3 = tdes3;                       /* ES, JT, UF, LC, EC, IHE ... */
+    return EQOS_OK;
+}
+
+
+/* ===================== RX / TX with timestamp ===================== */
+
+/*
+ * eth_rx_frame_receive_timestamp() - eth_rx_frame_receive() + RX timestamp.
+ * Only for tests that already enabled MAC_Timestamp_Control.TSENA=1 and
+ * TSENALL=1. The timestamp is read only when the LD RDES1.TSA=1: it is in the
+ * next descriptor, a context descriptor (CTXT=1, RDES0 = ns, RDES1 = s). That
+ * descriptor is re-armed and rx_head moves on. All-ones = corrupted.
+ * Result in info->ts_valid / ts_ns / ts_s.
+ */
+int eth_rx_frame_receive_timestamp(struct eqos_dev *eth, struct eqos_desc *rx_desc,
+                                   uint8_t rx_buf[][EQOS_BUF_SIZE],
+                                   uint8_t *out, size_t out_size,
+                                   uint32_t first_timeout_us, struct eth_rx_frame *info)
+{
+    const int ret = eth_rx_frame_receive(eth, rx_desc, rx_buf, out, out_size,
+                                         first_timeout_us, info);
+    if (ret != EQOS_OK || (info->rdes1 & EQOS_RDES1_WB_TSA) == 0U)
+        return ret;                               /* no timestamp for this frame */
+
+    const uint32_t idx = eth->rx_head;
+    struct eqos_desc *ctx = &rx_desc[idx];
+    uint32_t des3;
+    if (eth_desc_wait_own(ctx, ETH_RX_NEXT_DESC_TIMEOUT_US, &des3) &&
+        (des3 & EQOS_RDES3_WB_CTXT) != 0U) {
+        info->ts_ns = ctx->des0;
+        info->ts_s = ctx->des1;
+        info->ts_valid = !(info->ts_ns == 0xFFFFFFFFU && info->ts_s == 0xFFFFFFFFU);
+        eth_rx_rearm_desc(ctx, rx_buf[idx]);
+        eth->rx_head = (idx + 1U) & (EQOS_RX_DESC_COUNT - 1U);
+    }
+    return EQOS_OK;
+}
+
+/*
+ * eth_tx_frame_send_timestamp() - send one frame in ONE descriptor with
+ * TDES2.TTSE=1 and wait for completion. Only for tests that already enabled
+ * MAC_Timestamp_Control.TSENA=1; len <= 16383.
+ * The timestamp is read only when the write-back TDES3.TTSS=1 (the DMA then
+ * replaced TDES0/TDES1: TDES0 = ns, TDES1 = s). Result in info->ts_valid /
+ * ts_ns / ts_s. Returns EQOS_OK (check info->tdes3), EQOS_EINVAL or
+ * EQOS_ETIMEDOUT.
+ */
+int eth_tx_frame_send_timestamp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                                const uint8_t *frame, uint32_t len, uint32_t timeout_us,
+                                struct eth_tx_frame *info)
+{
+    const uint32_t idx = eth->tx_head;
+    struct eqos_desc *desc = &tx_desc[idx];
+    uint32_t tdes3;
+
+    memset(info, 0, sizeof(*info));
+    if (len == 0U || len > ETH_TX_PIECE_MAX)
+        return EQOS_EINVAL;
+    if (!eth_desc_wait_own(desc, ETH_TX_DESC_TIMEOUT_US, &tdes3))
+        return EQOS_ETIMEDOUT;                     /* slot still owned by DMA */
+
+    desc->des0 = (uint32_t)(uintptr_t)frame;       /* zero copy */
+    desc->des1 = 0U;
+    desc->des2 = (len & EQOS_TDES2_B1L_MASK) | EQOS_TDES2_TTSE;
+    __DSB();
+    desc->des3 = EQOS_TDES3_OWN | EQOS_TDES3_FD | EQOS_TDES3_LD |
+                 (len & EQOS_TDES3_FL_MASK);
+    __DSB();
+    eth->tx_head = (idx + 1U) & (EQOS_TX_DESC_COUNT - 1U);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR,
+                        (uint32_t)(uintptr_t)&tx_desc[eth->tx_head]);
+
+    if (!eth_desc_wait_own(desc, timeout_us, &tdes3))
+        return EQOS_ETIMEDOUT;
+    info->tdes3 = tdes3;
+    info->desc_used = 1U;
+    if ((tdes3 & EQOS_TDES3_WB_TTSS) != 0U) {
+        info->ts_ns = desc->des0;
+        info->ts_s = desc->des1;
+        info->ts_valid = true;
+    }
     return EQOS_OK;
 }
 

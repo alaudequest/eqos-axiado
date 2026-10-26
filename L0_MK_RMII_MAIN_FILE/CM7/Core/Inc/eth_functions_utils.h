@@ -5,7 +5,7 @@
 #include "lan8742.h"
 
 #define ETH_TEST_FRAME_MIN_SIZE 20U
-#define ETH_TEST_FRAME_MAX_SIZE 9014U /* 14-byte header + 9000-byte payload. */
+#define ETH_TEST_FRAME_MAX_SIZE 16383U /* max frame with MACCR.WD/JD=1 (watchdog test). */
 #define ETH_TEST_VLAN_FRAME_MAX_SIZE 9018U /* 18-byte header + 9000-byte payload. */
 
 /* Size includes the Ethernet header, excludes FCS/padding/preamble.
@@ -58,11 +58,16 @@ struct eqos_desc {
 /* Result of eth_rx_frame_receive(): status words come from the LD descriptor. */
 struct eth_rx_frame {
     uint32_t len;           /* total length from LD PL (after CST/ACS stripping) */
+    uint32_t rdes0;         /* LD RDES0: VLAN tags (IVT/OVT), valid when RDES3.RS0V=1 */
     uint32_t rdes1;         /* LD RDES1: IP/checksum status */
     uint32_t rdes2;         /* LD RDES2: valid only when RDES3.RS2V=1 */
     uint32_t rdes3;         /* LD RDES3: ES, GP, CE, RWT, OE, LT, PL */
     uint32_t desc_used;     /* data descriptors consumed by this frame */
     uint32_t desc_dropped;  /* stray/truncated descriptors discarded */
+    /* Filled only by eth_rx_frame_receive_timestamp(): */
+    bool ts_valid;          /* RX timestamp read: LD RDES1.TSA=1 and context desc */
+    uint32_t ts_ns;         /* context RDES0: nanoseconds (TSCTRLSSR=1) */
+    uint32_t ts_s;          /* context RDES1: seconds */
 };
 
 /* Receive one frame of any size into out[]. Returns EQOS_OK (check info->rdes3
@@ -78,6 +83,10 @@ int eth_rx_frame_receive(struct eqos_dev *eth, struct eqos_desc *rx_desc,
 struct eth_tx_frame {
     uint32_t tdes3;      /* LD TDES3 write-back: ES, JT, FF, LoC, NC, LC, EC, UF, IHE */
     uint32_t desc_used;  /* descriptors used for this frame */
+    /* Filled only by eth_tx_frame_send_timestamp(): */
+    bool ts_valid;       /* TX timestamp read: TDES3.TTSS=1 */
+    uint32_t ts_ns;      /* TDES0 write-back: nanoseconds (TSCTRLSSR=1) */
+    uint32_t ts_s;       /* TDES1 write-back: seconds */
 };
 
 /* Send one frame of any size directly from frame[] (zero copy) and wait for
@@ -88,6 +97,19 @@ int eth_tx_frame_send(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                       const uint8_t *frame, uint32_t len, uint32_t piece_max,
                       uint32_t fd_ctrl, uint32_t timeout_us,
                       struct eth_tx_frame *info);
+
+/* Same as eth_rx_frame_receive(), then the RX timestamp (context descriptor)
+ * when LD RDES1.TSA=1 -> info->ts_*. Caller has enabled TSENA and TSENALL. */
+int eth_rx_frame_receive_timestamp(struct eqos_dev *eth, struct eqos_desc *rx_desc,
+                                   uint8_t rx_buf[][EQOS_BUF_SIZE],
+                                   uint8_t *out, size_t out_size,
+                                   uint32_t first_timeout_us, struct eth_rx_frame *info);
+
+/* Send one frame (one descriptor, len <= 16383) with TDES2.TTSE=1; TX timestamp
+ * in info->ts_* when TDES3.TTSS=1. Caller has enabled TSENA. */
+int eth_tx_frame_send_timestamp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                                const uint8_t *frame, uint32_t len, uint32_t timeout_us,
+                                struct eth_tx_frame *info);
 
 /* Read-modify-write one register: (old & ~clear_mask) | set_mask, one write,
  * one readback; compare only the touched bits and print the result.
@@ -120,6 +142,43 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
 int eth_test_mac_pfr_hash_uc(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                              struct eqos_desc *rx_desc,
                              uint8_t rx_buf[][EQOS_BUF_SIZE]);
+
+/* MAC_Watchdog_Timeout test: MAC loopback, default 2 KB limit, PWE/WTO limit
+ * (WTO=1, 13), WD=1 disables the watchdog. Returns failure count, -1 on setup error. */
+int eth_test_mac_wtr_watchdog(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                              struct eqos_desc *rx_desc,
+                              uint8_t rx_buf[][EQOS_BUF_SIZE]);
+
+/* MAC_Q0_Tx_Flow_Ctrl pause test: MAC loopback, FCB_BPA pause frame with
+ * PT=0xFFFF and 0x0100, pause time from MAC RX/TX timestamps. Returns failure count. */
+int eth_test_mac_txfc_pause_timestamp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                                      struct eqos_desc *rx_desc,
+                                      uint8_t rx_buf[][EQOS_BUF_SIZE]);
+
+/* Same pause test, pause time from the CPU cycle counter (DWT->CYCCNT) and the
+ * basic RX/TX frame functions. Returns failure count. */
+int eth_test_mac_txfc_pause(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                            struct eqos_desc *rx_desc,
+                            uint8_t rx_buf[][EQOS_BUF_SIZE]);
+/* MACVTR double VLAN tests, MAC loopback. Return failure count, -1 on setup error.
+ * OUTER: outer S-VLAN filter (ERIVLT=0), VID mismatch, ERSVLM=0 type mismatch.
+ * INNER: inner C-VLAN filter (ERIVLT=1), VID match / mismatch.
+ * STRIP: inner tag strip (EIVLS=11), RS0V and RDES0 IVT/OVT. */
+int eth_test_mac_vtr_dvlan_outer(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                                 struct eqos_desc *rx_desc,
+                                 uint8_t rx_buf[][EQOS_BUF_SIZE]);
+int eth_test_mac_vtr_dvlan_inner(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                                 struct eqos_desc *rx_desc,
+                                 uint8_t rx_buf[][EQOS_BUF_SIZE]);
+int eth_test_mac_vtr_dvlan_strip(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                                 struct eqos_desc *rx_desc,
+                                 uint8_t rx_buf[][EQOS_BUF_SIZE]);
+/* MAC_Interrupt_Status MMCTXIS test: MAC loopback, counters preset near half,
+ * TXGPKTIS set; logs whether reading MMC_Tx_Interrupt or Tx_Packet_Count_Good
+ * clears it. Returns failure count, -1 on setup error. */
+int eth_test_mac_isr_mmc_tx(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                            struct eqos_desc *rx_desc,
+                            uint8_t rx_buf[][EQOS_BUF_SIZE]);
 
 /* 64-bit hash table index of a MAC address: CRC-32 (Ethernet polynomial) of
  * the 6 address bytes, then the upper 6 bits of the bit-reversed CRC.

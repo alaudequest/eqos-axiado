@@ -149,6 +149,34 @@ static uint8_t rx_buf[EQOS_RX_DESC_COUNT][EQOS_BUF_SIZE] __attribute__((aligned(
 /* Included after struct eqos_desc and the rings: the test uses descriptors. */
 #include "../../../0_test_cases/MAC_PFR_HASH_UC.c"
 #endif
+#if ACTIVE_TEST == TEST_MAC_WTR_WATCHDOG
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MAC_WTR_WATCHDOG.c"
+#endif
+#if ACTIVE_TEST == TEST_MAC_TXFC_PAUSE_TIMESTAMP
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MAC_Q0_TX_FLOW_CTRL_PAUSE_TIMESTAMP.c"
+#endif
+#if ACTIVE_TEST == TEST_MAC_TXFC_PAUSE
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MAC_Q0_TX_FLOW_CTRL_PAUSE.c"
+#endif
+#if ACTIVE_TEST == TEST_MAC_VTR_DVLAN_OUTER
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MAC_VTR_DVLAN_OUTER.c"
+#endif
+#if ACTIVE_TEST == TEST_MAC_VTR_DVLAN_INNER
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MAC_VTR_DVLAN_INNER.c"
+#endif
+#if ACTIVE_TEST == TEST_MAC_VTR_DVLAN_STRIP
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MAC_VTR_DVLAN_STRIP.c"
+#endif
+#if ACTIVE_TEST == TEST_MAC_ISR_MMC_TX
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MAC_ISR_MMC_TX.c"
+#endif
 
 /* These checks protect assumptions in the DMA configuration and wrap logic:
  * index = (index + 1) & (count - 1) requires a nonzero power-of-two ring count.
@@ -602,6 +630,20 @@ int main(void)
   (void)eth_test_mac_ecr_usp(&eth, tx_desc, rx_desc, rx_buf);
   #elif ACTIVE_TEST == TEST_MAC_PFR_HASH_UC
   (void)eth_test_mac_pfr_hash_uc(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MAC_WTR_WATCHDOG
+  (void)eth_test_mac_wtr_watchdog(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MAC_TXFC_PAUSE_TIMESTAMP
+  (void)eth_test_mac_txfc_pause_timestamp(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MAC_TXFC_PAUSE
+  (void)eth_test_mac_txfc_pause(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MAC_VTR_DVLAN_OUTER
+  (void)eth_test_mac_vtr_dvlan_outer(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MAC_VTR_DVLAN_INNER
+  (void)eth_test_mac_vtr_dvlan_inner(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MAC_VTR_DVLAN_STRIP
+  (void)eth_test_mac_vtr_dvlan_strip(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MAC_ISR_MMC_TX
+  (void)eth_test_mac_isr_mmc_tx(&eth, tx_desc, rx_desc, rx_buf);
   #else
   #error "Selected MAC control case is not implemented yet"
   #endif

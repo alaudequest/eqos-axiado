@@ -65,6 +65,7 @@
 #define EQOS_MAC_RXQ_CTRL1              0x0a4u
 #define EQOS_MAC_RXQ_CTRL2              0x0a8u
 #define EQOS_MAC_RXQ_CTRL3              0x0acu
+#define EQOS_MAC_RX_TX_STATUS           0x0b8u      /* MAC_Rx_Tx_Status, clear on read */
 #define EQOS_MAC_US_TIC_COUNTER         0x0dcu
 #define EQOS_MAC_VERSION                0x110u
 #define EQOS_MAC_DEBUG                  0x114u
@@ -72,6 +73,18 @@
 #define EQOS_MAC_HW_FEATURE1            0x120u
 #define EQOS_MAC_HW_FEATURE2            0x124u
 #define EQOS_MAC_HW_FEATURE3            0x128u
+#define EQOS_MAC_TS_CONTROL             0xb00u      /* MAC_Timestamp_Control */
+#define EQOS_MAC_SUB_SEC_INCR           0xb04u      /* MAC_Sub_Second_Increment */
+#define EQOS_MAC_TS_ADDEND              0xb18u      /* MAC_Timestamp_Addend */
+
+/* MAC_TS_CONTROL */
+#define EQOS_MAC_TSC_TSENA              (1u << 0)   /* timestamp enable */
+#define EQOS_MAC_TSC_TSCFUPDT           (1u << 1)   /* fine update */
+#define EQOS_MAC_TSC_TSINIT             (1u << 2)   /* init system time, self-clears */
+#define EQOS_MAC_TSC_TSADDREG           (1u << 5)   /* load addend, self-clears */
+#define EQOS_MAC_TSC_TSENALL            (1u << 8)   /* timestamp all RX packets */
+#define EQOS_MAC_TSC_TSCTRLSSR          (1u << 9)   /* sub-second rolls over at 1e9 (ns) */
+#define EQOS_MAC_SSIR_SSINC_SHIFT       16          /* sub-second increment [23:16] */
 #define EQOS_MAC_MDIO_ADDRESS           0x200u
 #define EQOS_MAC_MDIO_DATA              0x204u
 #define EQOS_MAC_ARP_ADDRESS            0x210u
@@ -113,8 +126,18 @@
 #define EQOS_MAC_EXT_CFG_SPEN           (1u << 17)  /* slow protocol detection enable */
 #define EQOS_MAC_EXT_CFG_USP            (1u << 18)  /* unicast slow protocol detect */
 
+/* MAC_WATCHDOG_TIMEOUT (MAC_Watchdog_Timeout, ETH_MACWTR) */
+#define EQOS_MAC_WTO_MASK               0xfu        /* limit = (WTO + 2) x 1024 bytes */
+#define EQOS_MAC_WTO_PWE                (1u << 8)   /* programmable watchdog enable */
+
+/* MAC_RX_TX_STATUS (MAC_Rx_Tx_Status, ETH_MACRXTXSR) */
+#define EQOS_MAC_RXTX_STS_RWT           (1u << 8)   /* receive watchdog timeout */
+#define EQOS_MAC_RXTX_STS_TJT           (1u << 0)   /* transmit jabber timeout */
+
 /* MAC_PACKET_FILTER */
 #define EQOS_MAC_PKT_FILTER_VTFE        (1u << 16)  /* VLAN tag filter enable */
+#define EQOS_MAC_PKT_FILTER_PCF_MASK    (3u << 6)   /* pass control packets */
+#define EQOS_MAC_PKT_FILTER_PCF_ALL     (2u << 6)   /* 10: forward all control packets */
 #define EQOS_MAC_PKT_FILTER_PR          (1u << 0)   /* promiscuous */
 #define EQOS_MAC_PKT_FILTER_HUC         (1u << 1)   /* hash unicast */
 #define EQOS_MAC_PKT_FILTER_HMC         (1u << 2)   /* hash multicast */
@@ -137,6 +160,7 @@
 #define EQOS_MAC_TXFC_PT_SHIFT          16          /* pause time */
 #define EQOS_MAC_TXFC_PT_MASK           0xffffu
 #define EQOS_MAC_TXFC_TFE               (1u << 1)   /* tx flow control enable */
+#define EQOS_MAC_TXFC_FCB_BPA           (1u << 0)   /* send pause frame (FD), self-clears */
 
 /* MAC_RX_FLOW_CTRL */
 #define EQOS_MAC_RXFC_RFE               (1u << 0)   /* rx flow control enable */
@@ -234,6 +258,7 @@
 #define EQOS_MTL_RXQ_RSF                (1u << 5)   /* rx store & forward */
 #define EQOS_MTL_RXQ_RTC_MASK           3u          /* rx threshold control */
 #define EQOS_MTL_RXQ_RTC_64             0u          /* 00: 64 bytes */
+#define EQOS_MTL_RXQ_FEP                (1u << 4)   /* forward error packets */
 #define EQOS_MTL_RXQ_DISTCPEF           (1u << 6)   /* H755: keep TCP/IP checksum-error packets */
 
 /* MTL_RXQ0_DEBUG */
@@ -264,6 +289,9 @@
 #define EQOS_DMA_CH0_RXDESC_RING_LEN    0x130u
 #define EQOS_DMA_CH0_INTERRUPT_ENABLE  0x134u
 #define EQOS_DMA_CH0_STATUS             0x160u  /* [THEM] debug */
+/* DMA_CH0_STATUS bits (write 1 to clear) */
+#define EQOS_DMA_CH_STATUS_RWT          (1u << 9)   /* receive watchdog timeout */
+#define EQOS_DMA_CH_STATUS_AIS          (1u << 14)  /* abnormal interrupt summary */
 
 /* DMA_MODE */
 #define EQOS_DMA_MODE_SWR               (1u << 0)   /* software reset */
@@ -303,6 +331,8 @@
 
 /* --- TX, read format (driver ghi) --- */
 #define EQOS_TDES2_B1L_MASK             0x3fffu     /* buffer 1 length */
+#define EQOS_TDES2_TTSE                 (1u << 30)  /* TX timestamp enable (first desc) */
+#define EQOS_TDES3_WB_TTSS              (1u << 17)  /* write-back: TX timestamp in TDES0/1 */
 #define EQOS_TDES2_IOC                  (1u << 31)  /* interrupt on completion */
 #define EQOS_TDES3_OWN                  (1u << 31)
 #define EQOS_TDES3_CTXT                 (1u << 30)  /* 0 = normal descriptor */
@@ -332,6 +362,7 @@
 #define EQOS_RDES3_WB_LT_TYPE           (1u << 16)  /* 001: type packet */
 #define EQOS_RDES3_WB_LT_OAM            (7u << 16)  /* 111: OAM / slow protocol */
 #define EQOS_RDES1_WB_OPC_SHIFT         16          /* RDES1[31:16] OAM subtype/code */
+#define EQOS_RDES1_WB_TSA               (1u << 14)  /* RX timestamp in next context desc */
 #define EQOS_RDES2_WB_HF                (1u << 18)  /* hash filter pass */
 #define EQOS_RDES2_WB_MADRM_SHIFT       19          /* RDES2[26:19] MAC addr match / hash value */
 #define EQOS_RDES2_WB_MADRM_MASK        (0xffu << 19)
