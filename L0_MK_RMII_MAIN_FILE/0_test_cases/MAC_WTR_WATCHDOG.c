@@ -11,14 +11,15 @@
  *
  * PWE=1: a received frame longer than (WTO + 2) x 1024 bytes is cut and
  * reported in RDES3.RWT, MAC_Rx_Tx_Status.RWT and DMA_CH0_Status.RWT.
- *   Case 1: WTO=1  (L=3072):  3008 B -> RWT=0,  3136 B -> RWT=1
- *   Case 2: WTO=13 (L=15360): 15296 B -> RWT=0, 15424 B -> RWT=1
+ *   Case 1: WTO=1 (L=3072):  3008 B -> RWT=0,  3136 B -> RWT=1
+ *   Case 2: WTO=9 (L=11264): 11200 B -> RWT=0, 11328 B -> RWT=1
  * Path: internal MAC loopback (main.c), WD=0 (reset value).
  * Settings needed only by this test (restored at the end): JD=1 (TX jabber
  * off), MTL threshold mode TTC/RTC=64, FEP=1 (forward the cut frame). */
 
 #define WTR_TEST_TIMEOUT_US  100000U
 #define WTR_TEST_BUF_SIZE    16384U
+#define WTR_MTL_RXQ0_MISSED  0x34u   /* MTL_RxQ0_Missed_Packet_Overflow_Cnt (0xD34), clear on read */
 
 static uint8_t wtr_tx_buf[WTR_TEST_BUF_SIZE] __attribute__((aligned(32)));
 static uint8_t wtr_rx_frame[WTR_TEST_BUF_SIZE];
@@ -94,21 +95,32 @@ int eth_test_mac_wtr_watchdog(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                 break;
             }
 
-            /* ---------- 5. Check RWT in descriptor, MAC and DMA status ---------- */
+            /* ---------- 5. Check TX status, RWT in descriptor, MAC and DMA status, length ---------- */
+            const bool tx_ok = (txf.tdes3 & EQOS_TDES3_WB_ES) == 0U;            /* TX sent without error */
             const bool rwt_desc = (rxf.rdes3 & EQOS_RDES3_WB_RWT) != 0U;
             const bool rwt_mac = (AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_RX_TX_STATUS) &
                                   EQOS_MAC_RXTX_STS_RWT) != 0U;
             const bool rwt_dma = (AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_STATUS) &
                                   EQOS_DMA_CH_STATUS_RWT) != 0U;
-            const bool pass = rwt_desc == expect_cut && rwt_mac == expect_cut &&
-                              rwt_dma == expect_cut &&
-                              (!expect_cut || rxf.len <= limit + 4U);
+            const bool len_ok = expect_cut ?
+                (rxf.len > 0U && rxf.len <= limit + 4U) :                         /* cut: not empty, not past limit */
+                (rxf.len == size && memcmp(wtr_rx_frame, wtr_tx_buf, size) == 0); /* received: whole frame intact */
+            const bool pass = tx_ok && len_ok && rwt_desc == expect_cut &&
+                              rwt_mac == expect_cut && rwt_dma == expect_cut;
             printf("TX %lu B -> PL=%lu, RWT desc/MAC/DMA=%u/%u/%u, expect %s: %s\r\n",
                    (unsigned long)size, (unsigned long)rxf.len,
                    (unsigned int)rwt_desc, (unsigned int)rwt_mac, (unsigned int)rwt_dma,
                    expect_cut ? "CUT" : "RECEIVED", pass ? "OK" : "FAIL");
-            if (!pass)
+            if (!pass) {
+                /* debug on fail only: TX status, raw RX status, ring use, RBU, MTL overflow */
+                printf("  TDES3=0x%08lX RDES3=0x%08lX desc used/dropped=%lu/%lu "
+                       "DMA_CH0_Status=0x%08lX MTL_RxQ0_Missed=0x%08lX\r\n",
+                       (unsigned long)txf.tdes3, (unsigned long)rxf.rdes3,
+                       (unsigned long)rxf.desc_used, (unsigned long)rxf.desc_dropped,
+                       (unsigned long)AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_STATUS),
+                       (unsigned long)AX_BASE_READ_REG32(EQOS_MTL_BASE, WTR_MTL_RXQ0_MISSED));
                 case_pass = false;
+            }
         }
         if (stop)
             break;

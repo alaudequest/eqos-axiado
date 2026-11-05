@@ -187,7 +187,7 @@ static bool eth_desc_wait_own(const struct eqos_desc *desc, uint32_t timeout_us,
 {
     for (uint32_t elapsed = 0U;; ++elapsed) {
         *des3 = desc->des3;
-        if ((*des3 & EQOS_RDES3_OWN) == 0U) {
+        if ((*des3 & EQOS_DES3_OWN) == 0U) {
             __DSB();
             return true;
         }

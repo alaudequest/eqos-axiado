@@ -30,17 +30,9 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                          struct eqos_desc *rx_desc,
                          uint8_t rx_buf[][EQOS_BUF_SIZE])
 {
-    static const struct {
-        bool usp;               /* ETH_MACECR.USP */
-        uint32_t expected_lt;   /* expected RDES3.LT */
-        const char *name;
-    } cases[] = {
-        {false, EQOS_RDES3_WB_LT_TYPE, "unicast not detected (LT=0b001)"},
-        {true,  EQOS_RDES3_WB_LT_OAM,  "unicast detected (LT=0b111)"},
-    };
     /* Slow Protocol subtype 0x03 (OAM), flags 0x0000, code 0x00, then zeros. */
     static const uint8_t pattern[] = {USP_TEST_SUBTYPE, 0x00, 0x00, 0x00};
-    const unsigned int case_count = 2; //2 cases in cases[]
+    const unsigned int case_count = 2U; //case 1 USP=0, case 2 USP=1
     unsigned int failures = 0U;
     unsigned int passes = 0U;
 
@@ -49,7 +41,10 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
         return -1;
     const uint8_t *mac0 = eth->cfg.mac_addr; /* DA = SA = MAC0 */
 
-    /* ---------- 1. MAC setup: no MAC loopback, normal DA filtering ---------- */
+    /* ---------- 1. Setup: no MAC loopback (PHY loopback), normal DA filtering ---------- */
+    const uint32_t macecr_saved = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_EXT_CONFIGURATION);
+    const uint32_t maccr_saved  = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
+    const uint32_t pfr_saved    = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER);
     if (!ETH_REG_UPDATE(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION,
                         EQOS_MAC_CFG_LM,
                         EQOS_MAC_CFG_FES | EQOS_MAC_CFG_DM |
@@ -58,6 +53,8 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
         !ETH_REG_UPDATE(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER,
                         EQOS_MAC_PKT_FILTER_PR, 0U)) {
         printf("FAIL: MAC setup readback\r\n");
+        AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION, maccr_saved);
+        AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER, pfr_saved);
         return -1;
     }
 
@@ -72,12 +69,14 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
     }
 
     for (unsigned int case_idx = 0U; case_idx < case_count; ++case_idx) {
-        const bool usp = cases[case_idx].usp;
+        const bool usp = (case_idx == 1U);
+        const uint32_t expected_lt = usp ? EQOS_RDES3_WB_LT_OAM : EQOS_RDES3_WB_LT_TYPE;
         bool case_pass = true;
 
         /* ---------- 3. Configure ETH_MACECR: SPEN=1, USP per case ---------- */
-        printf("\r\n--- Case %u/%u: SPEN=1 USP=%u: %s ---\r\n",
-               case_idx + 1U, case_count, (unsigned int)usp, cases[case_idx].name);
+        printf("\r\n--- Case %u/%u: SPEN=1 USP=%u, DA=MAC0: expect LT=%lu ---\r\n",
+               case_idx + 1U, case_count, (unsigned int)usp,
+               (unsigned long)(expected_lt >> 16));
         if (!ETH_REG_UPDATE(EQOS_MAC_BASE, EQOS_MAC_EXT_CONFIGURATION,
                             EQOS_MAC_EXT_CFG_SPEN | EQOS_MAC_EXT_CFG_USP,
                             EQOS_MAC_EXT_CFG_SPEN | (usp ? EQOS_MAC_EXT_CFG_USP : 0U))) {
@@ -102,9 +101,9 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
 
         /* ---------- 5. Receive the looped-back frame ---------- */
         struct eth_rx_frame rxf;
-        int rx_status = eth_rx_frame_receive(eth, rx_desc, rx_buf, usp_rx_frame,
-                                             sizeof(usp_rx_frame),
-                                             USP_TEST_TIMEOUT_US, &rxf);
+        const int rx_status = eth_rx_frame_receive(eth, rx_desc, rx_buf, usp_rx_frame,
+                                                   sizeof(usp_rx_frame),
+                                                   USP_TEST_TIMEOUT_US, &rxf);
         if (rx_status != EQOS_OK) {
             printf("RESULT: FAIL (RX %s, DMACSR=0x%08lX)\r\n",
                    rx_status == EQOS_ETIMEDOUT ? "timeout" : "frame stalled mid-way",
@@ -113,26 +112,16 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
             break;
         }
         const uint32_t lt = rxf.rdes3 & EQOS_RDES3_WB_LT_MASK;
-        printf("RX done: RDES1=0x%08lX RDES3=0x%08lX\r\n",
-               (unsigned long)rxf.rdes1, (unsigned long)rxf.rdes3);
-        printf("  LT=0b%lu%lu%lu OPC=0x%04lX ES=%lu PL=%lu\r\n",
-               (unsigned long)((lt >> 18) & 1U), (unsigned long)((lt >> 17) & 1U),
-               (unsigned long)((lt >> 16) & 1U),
+        printf("RX done: RDES1=0x%08lX RDES3=0x%08lX LT=%lu OPC=0x%04lX ES=%lu PL=%lu\r\n",
+               (unsigned long)rxf.rdes1, (unsigned long)rxf.rdes3, (unsigned long)(lt >> 16),
                (unsigned long)(rxf.rdes1 >> EQOS_RDES1_WB_OPC_SHIFT),
                (unsigned long)((rxf.rdes3 & EQOS_RDES3_WB_ES) != 0U),
                (unsigned long)rxf.len);
-        printf("RX frame (%lu bytes):\r\n", (unsigned long)rxf.len);
-        for (uint32_t i = 0U; i < rxf.len && i < sizeof(usp_rx_frame); ++i) {
-            printf("%02X ", (unsigned int)usp_rx_frame[i]);
-            if ((i + 1U) % 16U == 0U)
-                printf("\r\n");
-        }
-        printf("\r\n");
 
         /* ---------- 6. Check LT, then the whole frame ---------- */
-        if (lt != cases[case_idx].expected_lt) {
-            printf("FAIL: LT=0x%lX, expected 0x%lX\r\n", (unsigned long)(lt >> 16),
-                   (unsigned long)(cases[case_idx].expected_lt >> 16));
+        if (lt != expected_lt) {
+            printf("FAIL: LT=%lu, expected %lu\r\n", (unsigned long)(lt >> 16),
+                   (unsigned long)(expected_lt >> 16));
             case_pass = false;
         }
         if ((rxf.rdes3 & EQOS_RDES3_WB_ES) != 0U) {
@@ -164,10 +153,10 @@ int eth_test_mac_ecr_usp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
             ++failures;
     }
 
-    /* ---------- 7. Restore: SPEN=0, USP=0 ---------- */
-    uint32_t macecr = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_EXT_CONFIGURATION);
-    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_EXT_CONFIGURATION,
-                        macecr & ~(EQOS_MAC_EXT_CFG_SPEN | EQOS_MAC_EXT_CFG_USP));
+    /* ---------- 7. Restore MACECR, MACCR, MACPFR ---------- */
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_EXT_CONFIGURATION, macecr_saved);
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION, maccr_saved);
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_PACKET_FILTER, pfr_saved);
 
     printf("\r\n========== USP test: %u/%u PASS, %u failure(s) ==========\r\n",
            passes, case_count, failures);

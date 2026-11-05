@@ -177,6 +177,10 @@ static uint8_t rx_buf[EQOS_RX_DESC_COUNT][EQOS_BUF_SIZE] __attribute__((aligned(
 /* Included after struct eqos_desc and the rings: the test uses descriptors. */
 #include "../../../0_test_cases/MAC_ISR_MMC_TX.c"
 #endif
+#if ACTIVE_TEST == TEST_MTL_RXQ0_OVERFLOW
+/* Included after struct eqos_desc and the rings: the test uses descriptors. */
+#include "../../../0_test_cases/MTL_RXQ0_OVERFLOW.c"
+#endif
 
 /* These checks protect assumptions in the DMA configuration and wrap logic:
  * index = (index + 1) & (count - 1) requires a nonzero power-of-two ring count.
@@ -623,7 +627,7 @@ int main(void)
   while (send_requested == 0U) { }
   send_requested = 0U;
   #if ACTIVE_TEST == TEST_MAC_CTRL_SARC
-  (void)eth_test_mac_ctrl_sarc(&eth, tx_desc, rx_desc, tx_buf, rx_buf);
+  (void)eth_test_mac_ctrl_sarc(&eth, tx_desc, rx_desc, rx_buf);
   #elif ACTIVE_TEST == TEST_MAC_CTRL_GPSLCE
   (void)eth_test_mac_ctrl_gpslce(&eth, tx_desc, rx_desc, rx_buf);
   #elif ACTIVE_TEST == TEST_MAC_ECR_USP
@@ -644,6 +648,8 @@ int main(void)
   (void)eth_test_mac_vtr_dvlan_strip(&eth, tx_desc, rx_desc, rx_buf);
   #elif ACTIVE_TEST == TEST_MAC_ISR_MMC_TX
   (void)eth_test_mac_isr_mmc_tx(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_MTL_RXQ0_OVERFLOW
+  (void)eth_test_mtl_rxq0_overflow(&eth, tx_desc, rx_desc, rx_buf);
   #else
   #error "Selected MAC control case is not implemented yet"
   #endif

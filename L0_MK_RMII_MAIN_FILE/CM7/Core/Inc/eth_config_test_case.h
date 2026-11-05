@@ -30,10 +30,11 @@
 #define TEST_MAC_VTR_DVLAN_INNER      27
 #define TEST_MAC_VTR_DVLAN_STRIP      28
 #define TEST_MAC_ISR_MMC_TX           29
+#define TEST_MTL_RXQ0_OVERFLOW        30
 
 /* ARPEN runs through the normal main.c RX flow, not the MAC control runner. */
 #define ETH_MAC_CTRL_TEST_SELECTED (ACTIVE_TEST >= TEST_MAC_CTRL_SARC && \
-                                    ACTIVE_TEST <= TEST_MAC_ISR_MMC_TX)
+                                    ACTIVE_TEST <= TEST_MTL_RXQ0_OVERFLOW)
 
 /* Queue cases use the queue runner. MAC control cases use eth_functions.c. */
 #define ETH_QUEUE_TEST_SELECTED (ACTIVE_TEST >= TEST_RMII_MTL_TX_STORE_FORWARD && \
@@ -56,7 +57,7 @@
 
 /*Select the test to execute*/
 #ifndef ACTIVE_TEST
-#define ACTIVE_TEST     29
+#define ACTIVE_TEST     20
 #endif
 
 #endif

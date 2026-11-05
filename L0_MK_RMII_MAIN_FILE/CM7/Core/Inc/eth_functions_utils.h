@@ -125,7 +125,6 @@ bool eth_reg_update(const char *name, uint32_t addr,
  * Call after TE/RE and DMA ST/SR are started. Returns failure count, -1 on setup error. */
 int eth_test_mac_ctrl_sarc(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                            struct eqos_desc *rx_desc,
-                           uint8_t tx_buf[][EQOS_BUF_SIZE],
                            uint8_t rx_buf[][EQOS_BUF_SIZE]);
 /* GPSLCE test: GPSL=3000, MAC loopback, 3000 B (GP=0) and 3001 B (GP=1) on wire.
  * Call after TE/RE and DMA ST/SR are started. Returns failure count, -1 on setup error. */
@@ -143,8 +142,8 @@ int eth_test_mac_pfr_hash_uc(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                              struct eqos_desc *rx_desc,
                              uint8_t rx_buf[][EQOS_BUF_SIZE]);
 
-/* MAC_Watchdog_Timeout test: MAC loopback, default 2 KB limit, PWE/WTO limit
- * (WTO=1, 13), WD=1 disables the watchdog. Returns failure count, -1 on setup error. */
+/* MAC_Watchdog_Timeout test: MAC loopback, PWE=1 with WTO=1 (3 KB) and WTO=9 (11 KB),
+ * one frame below and one above each limit. Returns failure count, -1 on setup error. */
 int eth_test_mac_wtr_watchdog(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                               struct eqos_desc *rx_desc,
                               uint8_t rx_buf[][EQOS_BUF_SIZE]);
@@ -179,6 +178,12 @@ int eth_test_mac_vtr_dvlan_strip(struct eqos_dev *eth, struct eqos_desc *tx_desc
 int eth_test_mac_isr_mmc_tx(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                             struct eqos_desc *rx_desc,
                             uint8_t rx_buf[][EQOS_BUF_SIZE]);
+/* MTL_RxQ0 overflow test: MAC loopback, frames sent without reading RX; ring fits
+ * (no overflow) and ring + FIFO overflow, drained in order, then recovery frame.
+ * Returns failure count, -1 on setup error. */
+int eth_test_mtl_rxq0_overflow(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                               struct eqos_desc *rx_desc,
+                               uint8_t rx_buf[][EQOS_BUF_SIZE]);
 
 /* 64-bit hash table index of a MAC address: CRC-32 (Ethernet polynomial) of
  * the 6 address bytes, then the upper 6 bits of the bit-reversed CRC.

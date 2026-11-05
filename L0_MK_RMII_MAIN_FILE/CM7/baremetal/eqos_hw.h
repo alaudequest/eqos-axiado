@@ -329,6 +329,10 @@
 /* Descriptor                                                          */
 /* ------------------------------------------------------------------ */
 
+/**/
+/* --- TX, RX Descriptor own bit (31)  --- */
+#define EQOS_DES3_OWN             (1u << 31)     /* OWN bit - Polling wait for OWN bit set in Tx, Rx Descriptor */
+
 /* --- TX, read format (driver ghi) --- */
 #define EQOS_TDES2_B1L_MASK             0x3fffu     /* buffer 1 length */
 #define EQOS_TDES2_TTSE                 (1u << 30)  /* TX timestamp enable (first desc) */

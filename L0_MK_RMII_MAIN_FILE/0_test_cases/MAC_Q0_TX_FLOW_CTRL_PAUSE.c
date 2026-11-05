@@ -22,7 +22,7 @@
  *   Case 1: PT=0xFFFF -> 335539 us. The pause timer runs on the RMII reference
  *           clock (PHY crystal), DWT on the core clock (HSI here): case 1
  *           measures the core clock error in ppm (limit +-2%).
- *   Case 2: PT=0x0100 -> 1311 us x (1 + case 1 error), window -20/+200 us:
+ *   Case 2: PT=0x0100 -> 1311 us x (1 + case 1 error), window -20/+50 us:
  *           proves the pause time follows the PT value.
  * Nothing is printed between T0 and queuing the data frame (UART is slow). */
 
@@ -31,7 +31,7 @@
 #define TXFC_FCB_TIMEOUT_US    10000U
 #define TXFC_FRAME_LEN         64U
 #define TXFC_WIN_LOW_NS        20000    /* case 2 window: -20 us */
-#define TXFC_WIN_HIGH_NS       200000   /*                +200 us */
+#define TXFC_WIN_HIGH_NS       50000    /* +50 us: covers RX/TX polling, rejects a wrong PT */
 #define TXFC_CLK_TOL_PPM       20000    /* +-2 %: HSI tolerance (case 1) */
 
 static uint8_t txfc_tx_buf[TXFC_FRAME_LEN] __attribute__((aligned(32)));
@@ -41,7 +41,7 @@ int eth_test_mac_txfc_pause(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                             struct eqos_desc *rx_desc,
                             uint8_t rx_buf[][EQOS_BUF_SIZE])
 {
-    static const uint16_t pause_time[2] = {0xFFFFU, 0x0010U};
+    static const uint16_t pause_time[2] = {0xFFFFU, 0x0100U}; /* case 2: 1310.72 us */
     static const uint8_t pause_da[6] = {0x01, 0x80, 0xC2, 0x00, 0x00, 0x01};
     static const uint8_t pattern[] = {0x17, 0x69, 0x29, 0x36, 0x98, 0x99};
     const unsigned int case_count = 2U;
