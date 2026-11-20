@@ -73,6 +73,11 @@
 #define EQOS_MAC_HW_FEATURE1            0x120u
 #define EQOS_MAC_HW_FEATURE2            0x124u
 #define EQOS_MAC_HW_FEATURE3            0x128u
+/* MMC counters (offset from EQOS_MAC_BASE) */
+#define EQOS_MMC_TX_PACKET_COUNT_GOOD   0x768u  /* Tx_Packet_Count_Good */
+#define EQOS_MMC_RX_CRC_ERROR_PACKETS   0x794u  /* Rx_CRC_Error_Packets */
+#define EQOS_MMC_RX_ALIGN_ERROR_PACKETS 0x798u  /* Rx_Alignment_Error_Packets */
+#define EQOS_MMC_RX_UNICAST_GOOD        0x7c4u  /* Rx_Unicast_Packets_Good */
 #define EQOS_MAC_TS_CONTROL             0xb00u      /* MAC_Timestamp_Control */
 #define EQOS_MAC_SUB_SEC_INCR           0xb04u      /* MAC_Sub_Second_Increment */
 #define EQOS_MAC_TS_ADDEND              0xb18u      /* MAC_Timestamp_Addend */

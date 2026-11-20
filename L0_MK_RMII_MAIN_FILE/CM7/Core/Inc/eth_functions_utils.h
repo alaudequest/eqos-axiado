@@ -82,8 +82,9 @@ int eth_rx_frame_receive(struct eqos_dev *eth, struct eqos_desc *rx_desc,
 /* Result of eth_tx_frame_send(): status is the LD descriptor write-back. */
 struct eth_tx_frame {
     uint32_t tdes3;      /* LD TDES3 write-back: ES, JT, FF, LoC, NC, LC, EC, UF, IHE */
-    uint32_t desc_used;  /* descriptors used for this frame */
-    /* Filled only by eth_tx_frame_send_timestamp(): */
+    uint32_t desc_used;  /* descriptors used for this frame (context included) */
+    uint32_t ctx_tdes3;  /* context descriptor TDES3 write-back, 0 = no context */
+    /* Filled by eth_tx_frame_send_timestamp(), and by eth_egress_packet*() when TDES3.TTSS=1: */
     bool ts_valid;       /* TX timestamp read: TDES3.TTSS=1 */
     uint32_t ts_ns;      /* TDES0 write-back: nanoseconds (TSCTRLSSR=1) */
     uint32_t ts_s;       /* TDES1 write-back: seconds */
@@ -110,6 +111,64 @@ int eth_rx_frame_receive_timestamp(struct eqos_dev *eth, struct eqos_desc *rx_de
 int eth_tx_frame_send_timestamp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                                 const uint8_t *frame, uint32_t len, uint32_t timeout_us,
                                 struct eth_tx_frame *info);
+
+/* ===================== B0-style packet TX / RX (per DMA channel) ===================== */
+
+#define ETH_MAX_CH                  8U        /* DMA channels supported by the ring table */
+#define ETH_PKT_DEFAULT_TIMEOUT_US  100000U   /* until eth_pkt_set_timeout() is called */
+
+/* Return codes of eth_egress_packet*() / eth_ingress_packet() (>= 0 = length). */
+#define ETH_PKT_ETIMEOUT  (-1)  /* TX not completed / RX no frame started */
+#define ETH_PKT_EINVAL    (-2)  /* bad argument, channel not initialized, RX frame > blen */
+#define ETH_PKT_ESTALL    (-3)  /* RX frame started but stopped part-way */
+
+/* One frame for eth_egress_packet_ex(): optional context descriptor, then ONE
+ * normal descriptor (FD+LD) with buffer 1 and optional buffer 2. */
+struct eth_tx_req {
+    bool ctx_valid;              /* true: context descriptor in the slot before */
+    uint32_t ctx_tdes[3];        /* context TDES0..TDES2 (TDES2 [13:0] = MSS ...) */
+    uint32_t ctx_tdes3;          /* context TDES3 (TCMSSV, OSTC, VLTV, VT ...);
+                                  * OWN and CTXT are set by the function */
+    const uint8_t *buf1;         /* required, 1..16383 bytes */
+    uint32_t len1;
+    const uint8_t *buf2;         /* optional (NULL with len2 = 0), 0..16383 bytes */
+    uint32_t len2;
+    uint32_t fd_tdes2;           /* only IOC [31], TTSE [30], VTIR [15:14] are used */
+    uint32_t fd_tdes3;           /* only [27:16] are used: CPC, SAIC, THL, TSE, CIC */
+    uint32_t tdes3_len;          /* 0: FL = len1 + len2. Else written to TDES3 [17:0]
+                                  * as is (TSO: TPL). */
+};
+
+/* Bind the software state of one DMA channel. Rings, buffers, RBSZ and DMA
+ * start are programmed by the caller (main.c for CH0) BEFORE this call; heads
+ * start at 0, so call it before any traffic on that channel. */
+int eth_pkt_ring_init(int ch, struct eqos_desc *tx_desc, uint32_t tx_count,
+                      struct eqos_desc *rx_desc, uint32_t rx_count,
+                      uint8_t rx_buf[][EQOS_BUF_SIZE]);
+
+/* TX: wait for completion of the frame; tx_us = 0: pipelined, egress returns
+ * once the frame is queued (no status, end the burst with eth_egress_flush()).
+ * RX: wait for the first descriptor; rx_us = 0: check once, no wait. */
+void eth_pkt_set_timeout(uint32_t tx_us, uint32_t rx_us);
+
+/* Wait until DMA has released every TX descriptor of channel ch. */
+int eth_egress_flush(int ch, uint32_t timeout_us);
+
+/* Send one frame from buf[] (zero copy) on DMA channel ch and wait until it is
+ * sent. len <= 32766 (buffer 1 + buffer 2). Returns len or ETH_PKT_E*.
+ * TDES3 status is not judged: read eth_pkt_last_tx(ch)->tdes3. */
+int eth_egress_packet(int ch, const unsigned char buf[], int len);
+
+/* Same with full control: context descriptor, buffer 2, FD control bits. */
+int eth_egress_packet_ex(int ch, const struct eth_tx_req *req);
+
+/* Receive one frame from DMA channel ch into buf[]. Returns the frame length
+ * or ETH_PKT_E*. RDES status is not judged: read eth_pkt_last_rx(ch). */
+int eth_ingress_packet(int ch, unsigned char buf[], int blen);
+
+/* Status of the last call on channel ch, NULL for an invalid channel. */
+const struct eth_tx_frame *eth_pkt_last_tx(int ch);
+const struct eth_rx_frame *eth_pkt_last_rx(int ch);
 
 /* Read-modify-write one register: (old & ~clear_mask) | set_mask, one write,
  * one readback; compare only the touched bits and print the result.

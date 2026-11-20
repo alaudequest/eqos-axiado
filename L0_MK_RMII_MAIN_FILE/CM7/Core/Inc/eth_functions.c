@@ -478,6 +478,302 @@ int eth_tx_frame_send_timestamp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
 }
 
 
+/* ===================== B0-style packet TX / RX (per DMA channel) ===================== */
+
+#define ETH_DMA_CH_STRIDE        0x80U        /* RM: DMA_CH(#i) registers at +0x80*i */
+#define ETH_TX_FL_MAX            0x7FFFU      /* TDES3.FL [14:0] */
+#define ETH_TX_TPL_MASK          0x3FFFFU     /* TDES3.TPL [17:0] (TSE=1) */
+#define ETH_TX_SLOT_TIMEOUT_US   5000U        /* wait for DMA to free a slot (> one 1518 B frame at 10M) */
+#define ETH_TDES2_B2L_SHIFT      16U          /* TDES2.B2L [29:16] */
+#define ETH_TDES2_CTRL_MASK      0xC000C000U  /* IOC [31], TTSE [30], VTIR [15:14] */
+#define ETH_TDES3_CTRL_MASK      0x0FFF0000U  /* CPC, SAIC, THL, TSE, CIC [27:16] */
+
+struct eth_ring {
+    struct eqos_desc *desc;
+    uint8_t (*buf)[EQOS_BUF_SIZE];   /* RX only */
+    uint32_t count;
+    uint32_t head;                   /* next slot to fill (TX) / to read (RX) */
+};
+
+static struct eth_ring tx_ring[ETH_MAX_CH];
+static struct eth_ring rx_ring[ETH_MAX_CH];
+static struct eth_tx_frame last_tx[ETH_MAX_CH];
+static struct eth_rx_frame last_rx[ETH_MAX_CH];
+static uint32_t pkt_tx_timeout_us = ETH_PKT_DEFAULT_TIMEOUT_US;
+static uint32_t pkt_rx_timeout_us = ETH_PKT_DEFAULT_TIMEOUT_US;
+
+static uint32_t eth_ring_next(const struct eth_ring *r, uint32_t idx)
+{
+    return (idx + 1U == r->count) ? 0U : idx + 1U;   /* any ring size, not only 2^n */
+}
+
+static bool eth_ch_valid(int ch)
+{
+    return ch >= 0 && ch < (int)ETH_MAX_CH;
+}
+
+int eth_pkt_ring_init(int ch, struct eqos_desc *tx_desc, uint32_t tx_count,
+                      struct eqos_desc *rx_desc, uint32_t rx_count,
+                      uint8_t rx_buf[][EQOS_BUF_SIZE])
+{
+    if (!eth_ch_valid(ch) || tx_desc == NULL || rx_desc == NULL || rx_buf == NULL ||
+        tx_count < 3U || rx_count < 2U)
+        return ETH_PKT_EINVAL;     /* TX: context + normal + 1 free slot */
+
+    tx_ring[ch] = (struct eth_ring){ .desc = tx_desc, .buf = NULL,
+                                     .count = tx_count, .head = 0U };
+    rx_ring[ch] = (struct eth_ring){ .desc = rx_desc, .buf = rx_buf,
+                                     .count = rx_count, .head = 0U };
+    memset(&last_tx[ch], 0, sizeof(last_tx[ch]));
+    memset(&last_rx[ch], 0, sizeof(last_rx[ch]));
+    return EQOS_OK;
+}
+
+void eth_pkt_set_timeout(uint32_t tx_us, uint32_t rx_us)
+{
+    pkt_tx_timeout_us = tx_us;
+    pkt_rx_timeout_us = rx_us;
+}
+
+const struct eth_tx_frame *eth_pkt_last_tx(int ch)
+{
+    return eth_ch_valid(ch) ? &last_tx[ch] : NULL;
+}
+
+const struct eth_rx_frame *eth_pkt_last_rx(int ch)
+{
+    return eth_ch_valid(ch) ? &last_rx[ch] : NULL;
+}
+
+/*
+ * eth_egress_packet_ex() - send one frame and wait until it is sent.
+ *
+ * 1. Slots: [context (optional)] [normal FD+LD]. One normal descriptor holds
+ *    buffer 1 + buffer 2 (up to 2 x 16383 B), so no multi-descriptor frames.
+ * 2. Both slots must be free (OWN=0) before anything is written.
+ * 3. Order (databook 11.3.2.4: context before the normal descriptor):
+ *    fill all words, normal TDES3 with OWN, then context TDES3 with OWN|CTXT
+ *    LAST, then the tail pointer past the normal slot.
+ * 4. Wait for the normal descriptor, return its TDES3 (and the context TDES3)
+ *    in last_tx[ch]; timestamp when TTSS=1. Status bits are not judged.
+ *
+ * Assumptions: buffers in DMA-reachable RAM, D-cache off, TX DMA of channel ch
+ * already started. Channel ch feeds MTL TxQ ch (to be checked in the databook
+ * for the company chip).
+ * Returns len1 + len2, ETH_PKT_EINVAL or ETH_PKT_ETIMEOUT.
+ */
+int eth_egress_packet_ex(int ch, const struct eth_tx_req *req)
+{
+    if (!eth_ch_valid(ch) || tx_ring[ch].desc == NULL || req == NULL)
+        return ETH_PKT_EINVAL;
+
+    struct eth_ring *r = &tx_ring[ch];
+    struct eth_tx_frame *st = &last_tx[ch];
+    const uint32_t total = req->len1 + req->len2;
+    uint32_t des3;
+
+    memset(st, 0, sizeof(*st));
+    if (req->buf1 == NULL || req->len1 == 0U || req->len1 > ETH_TX_PIECE_MAX ||
+        req->len2 > ETH_TX_PIECE_MAX || ((req->buf2 == NULL) != (req->len2 == 0U)) ||
+        (req->tdes3_len == 0U && total > ETH_TX_FL_MAX))
+        return ETH_PKT_EINVAL;
+
+    const uint32_t ctx_idx = r->head;
+    const uint32_t nd_idx = req->ctx_valid ? eth_ring_next(r, ctx_idx) : ctx_idx;
+    struct eqos_desc *cd = &r->desc[ctx_idx];
+    struct eqos_desc *nd = &r->desc[nd_idx];
+
+    /* 2. Both slots free (ring full or previous frame still owned by DMA). */
+    if (!eth_desc_wait_own(cd, ETH_TX_SLOT_TIMEOUT_US, &des3) ||
+        !eth_desc_wait_own(nd, ETH_TX_SLOT_TIMEOUT_US, &des3))
+        return ETH_PKT_ETIMEOUT;
+
+    /* 3. Fill, publish normal OWN, then context OWN last. */
+    const uint32_t len_field = (req->tdes3_len != 0U) ?
+                               (req->tdes3_len & ETH_TX_TPL_MASK) :
+                               (total & EQOS_TDES3_FL_MASK);
+    nd->des0 = (uint32_t)(uintptr_t)req->buf1;                      /* zero copy */
+    nd->des1 = (uint32_t)(uintptr_t)req->buf2;                      /* 0 if unused */
+    nd->des2 = (req->len1 & EQOS_TDES2_B1L_MASK) |
+               ((req->len2 & ETH_TX_PIECE_MAX) << ETH_TDES2_B2L_SHIFT) |
+               (req->fd_tdes2 & ETH_TDES2_CTRL_MASK);
+    if (req->ctx_valid) {
+        cd->des0 = req->ctx_tdes[0];
+        cd->des1 = req->ctx_tdes[1];
+        cd->des2 = req->ctx_tdes[2];
+    }
+    __DSB();
+    nd->des3 = EQOS_TDES3_OWN | EQOS_TDES3_FD | EQOS_TDES3_LD |
+               (req->fd_tdes3 & ETH_TDES3_CTRL_MASK) | len_field;
+    if (req->ctx_valid) {
+        __DSB();
+        cd->des3 = (req->ctx_tdes3 & ~(EQOS_TDES3_OWN | EQOS_TDES3_CTXT)) |
+                   EQOS_TDES3_OWN | EQOS_TDES3_CTXT;              /* OWN last */
+    }
+    __DSB();
+    r->head = eth_ring_next(r, nd_idx);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE,
+                        EQOS_DMA_CH0_TXDESC_TAIL_PTR + (uint32_t)ch * ETH_DMA_CH_STRIDE,
+                        (uint32_t)(uintptr_t)&r->desc[r->head]);
+    st->desc_used = req->ctx_valid ? 2U : 1U;
+    if (pkt_tx_timeout_us == 0U)
+        return (int)total;          /* pipelined: queued, no completion wait, no status */
+
+    /* 4. Wait for completion, collect status. */
+    if (!eth_desc_wait_own(nd, pkt_tx_timeout_us, &des3))
+        return ETH_PKT_ETIMEOUT;
+    st->tdes3 = des3;                                  /* ES, JT, UF, LC, EC, IHE ... */
+    if (req->ctx_valid)
+        st->ctx_tdes3 = cd->des3;                      /* OWN=0, CTXT=1 when closed */
+    if ((des3 & EQOS_TDES3_WB_TTSS) != 0U) {
+        st->ts_ns = nd->des0;
+        st->ts_s = nd->des1;
+        st->ts_valid = true;
+    }
+    return (int)total;
+}
+
+/* Wait until DMA has released every TX descriptor of channel ch (end of a
+ * pipelined burst). Returns EQOS_OK, ETH_PKT_EINVAL or ETH_PKT_ETIMEOUT. */
+int eth_egress_flush(int ch, uint32_t timeout_us)
+{
+    if (!eth_ch_valid(ch) || tx_ring[ch].desc == NULL)
+        return ETH_PKT_EINVAL;
+
+    const struct eth_ring *r = &tx_ring[ch];
+    uint32_t des3;
+    for (uint32_t i = 0U; i < r->count; ++i) {
+        if (!eth_desc_wait_own(&r->desc[i], timeout_us, &des3))
+            return ETH_PKT_ETIMEOUT;
+    }
+    return EQOS_OK;
+}
+
+/* B0-style: buffer only. Frames > 16383 B go to buffer 2 of the same descriptor. */
+int eth_egress_packet(int ch, const unsigned char buf[], int len)
+{
+    if (buf == NULL || len <= 0 || (uint32_t)len > 2U * ETH_TX_PIECE_MAX)
+        return ETH_PKT_EINVAL;
+
+    struct eth_tx_req req = {0};
+    req.buf1 = buf;
+    req.len1 = ((uint32_t)len > ETH_TX_PIECE_MAX) ? ETH_TX_PIECE_MAX : (uint32_t)len;
+    if ((uint32_t)len > req.len1) {
+        req.buf2 = buf + req.len1;
+        req.len2 = (uint32_t)len - req.len1;
+    }
+    return eth_egress_packet_ex(ch, &req);
+}
+
+/* Rebuild all four words, publish OWN last, then wake DMA with the tail. */
+static void eth_ring_rx_rearm(int ch, struct eth_ring *r, uint32_t idx)
+{
+    struct eqos_desc *d = &r->desc[idx];
+
+    d->des0 = (uint32_t)(uintptr_t)r->buf[idx];
+    d->des1 = 0U;
+    d->des2 = 0U;
+    __DSB();
+    d->des3 = EQOS_RDES3_OWN | EQOS_RDES3_BUF1V;
+    __DSB();
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE,
+                        EQOS_DMA_CH0_RXDESC_TAIL_PTR + (uint32_t)ch * ETH_DMA_CH_STRIDE,
+                        (uint32_t)(uintptr_t)d);
+}
+
+/*
+ * eth_ingress_packet() - receive one frame of any size from channel ch.
+ *
+ * Same algorithm as eth_rx_frame_receive() (copy, re-arm at once, FD/LD
+ * resync, stray context skipped), plus:
+ * - per-channel ring and tail register;
+ * - frame > blen: the part that fits is copied, the frame is fully consumed
+ *   (ring stays in step) and ETH_PKT_EINVAL is returned;
+ * - RX timestamp read when LD RDES1.TSA=1 (context descriptor after LD).
+ * Status words of the LD descriptor in last_rx[ch], not judged.
+ * Returns the frame length (PL), ETH_PKT_ETIMEOUT, ETH_PKT_EINVAL or ETH_PKT_ESTALL.
+ */
+int eth_ingress_packet(int ch, unsigned char buf[], int blen)
+{
+    if (!eth_ch_valid(ch) || rx_ring[ch].desc == NULL || buf == NULL || blen <= 0)
+        return ETH_PKT_EINVAL;
+
+    struct eth_ring *r = &rx_ring[ch];
+    struct eth_rx_frame *st = &last_rx[ch];
+    const uint32_t size = (uint32_t)blen;
+    uint32_t rx_bytes = 0U;
+    bool in_frame = false;
+    bool too_big = false;
+    uint32_t timeout = pkt_rx_timeout_us;
+
+    memset(st, 0, sizeof(*st));
+    while (1) {
+        const uint32_t idx = r->head;
+        struct eqos_desc *d = &r->desc[idx];
+        uint32_t rdes3;
+
+        if (!eth_desc_wait_own(d, timeout, &rdes3))
+            return in_frame ? ETH_PKT_ESTALL : ETH_PKT_ETIMEOUT;
+
+        bool last = false;
+        if ((rdes3 & EQOS_RDES3_WB_CTXT) != 0U) {
+            /* stray context descriptor: not frame data */
+        } else if (!in_frame && (rdes3 & EQOS_RDES3_WB_FD) == 0U) {
+            ++st->desc_dropped;                       /* tail of an abandoned frame */
+        } else {
+            if ((rdes3 & EQOS_RDES3_WB_FD) != 0U) {
+                st->desc_dropped += st->desc_used;    /* FD mid-frame: restart */
+                st->desc_used = 0U;
+                rx_bytes = 0U;
+                too_big = false;
+                in_frame = true;
+            }
+            uint32_t chunk = EQOS_BUF_SIZE;
+            if ((rdes3 & EQOS_RDES3_WB_LD) != 0U) {
+                const uint32_t pl = rdes3 & EQOS_RDES3_WB_PL_MASK;
+                chunk = (pl > rx_bytes) ? pl - rx_bytes : 0U;
+                st->len   = pl;
+                st->rdes0 = d->des0;                  /* read status before re-arm */
+                st->rdes1 = d->des1;
+                st->rdes2 = d->des2;
+                st->rdes3 = rdes3;
+                last = true;
+            }
+            if (rx_bytes < size) {                    /* copy what fits */
+                const uint32_t room = size - rx_bytes;
+                memcpy(buf + rx_bytes, r->buf[idx], (chunk < room) ? chunk : room);
+            }
+            if (rx_bytes + chunk > size)
+                too_big = true;
+            rx_bytes += chunk;
+            ++st->desc_used;
+        }
+
+        eth_ring_rx_rearm(ch, r, idx);
+        r->head = eth_ring_next(r, idx);
+        if (last)
+            break;
+        timeout = in_frame ? ETH_RX_NEXT_DESC_TIMEOUT_US : pkt_rx_timeout_us;
+    }
+
+    /* RX timestamp: context descriptor right after LD when RDES1.TSA=1. */
+    if ((st->rdes1 & EQOS_RDES1_WB_TSA) != 0U) {
+        const uint32_t idx = r->head;
+        struct eqos_desc *ctx = &r->desc[idx];
+        uint32_t des3;
+        if (eth_desc_wait_own(ctx, ETH_RX_NEXT_DESC_TIMEOUT_US, &des3) &&
+            (des3 & EQOS_RDES3_WB_CTXT) != 0U) {
+            st->ts_ns = ctx->des0;
+            st->ts_s = ctx->des1;
+            st->ts_valid = !(st->ts_ns == 0xFFFFFFFFU && st->ts_s == 0xFFFFFFFFU);
+            eth_ring_rx_rearm(ch, r, idx);
+            r->head = eth_ring_next(r, idx);
+        }
+    }
+    return too_big ? ETH_PKT_EINVAL : (int)st->len;
+}
+
+
 /* ===================== Register update with readback ===================== */
 
 /*

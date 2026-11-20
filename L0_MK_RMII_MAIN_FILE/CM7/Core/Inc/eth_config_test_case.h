@@ -31,10 +31,35 @@
 #define TEST_MAC_VTR_DVLAN_STRIP      28
 #define TEST_MAC_ISR_MMC_TX           29
 #define TEST_MTL_RXQ0_OVERFLOW        30
+#define TEST_DMA_CH0_PKT_TXRX         31
+#define TEST_IXIA_DUT_TX              32  /* Ixia spec Test 2 */
+#define TEST_IXIA_REFLECT             33  /* Ixia spec Test 4 */
+#define TEST_IXIA_RX_BAD_CRC          34  /* IxTest8_BadCrc */
+#define TEST_IXIA_RX_ALIGN_ERR        35  /* IxTest8b_AlignErr */
+#define TEST_IXIA_RX_DRIBBLE          36  /* IxTest8c_Dribble */
+#define TEST_IXIA_RX_RUNT             37  /* IxTest8d_Runt */
+#define TEST_IXIA_RX_OVERSIZE         38  /* IxTest8e_Oversize */
+#define TEST_IXIA_RX_VLAN             39  /* IxTest8f_Vlan */
+#define TEST_IXIA_TX_PAUSE            40  /* IxTest8g_Pause */
+#define TEST_IXIA_RX_NO_CRC           41  /* IxTest8h_NoCrc */
+#define TEST_IXIA_RX_PREAMBLE         42  /* IxTest8i_Preamble */
+#define TEST_IXIA_RX_IFG              43  /* IxTest8j_Ifg */
+#define TEST_IXIA_RX_IP_CSUM_ERR      44  /* IxTest8k_IpCsumErr */
+#define TEST_IXIA_RX_IP_CSUM_DROP     45  /* IxTest8k_IpCsumErr, DIS_TCP_EF=0 */
+#define TEST_IXIA_RX_IP_LEN_ERR       46  /* IxTest8l_IpLenErr */
+#define TEST_IXIA_RX_IP_FRAG          47  /* IxTest8m_IpFrag */
+
+/* Ixia cases: real link (PHY auto-negotiation, LM=0), run from main.c.
+ * IDs 34..47 run once after USER; 32/33 run until reset. */
+#define ETH_IXIA_ONCE_TEST_SELECTED (ACTIVE_TEST >= TEST_IXIA_RX_BAD_CRC && \
+                                     ACTIVE_TEST <= TEST_IXIA_RX_IP_FRAG)
+#define ETH_IXIA_TEST_SELECTED (ACTIVE_TEST == TEST_IXIA_DUT_TX || \
+                                ACTIVE_TEST == TEST_IXIA_REFLECT || \
+                                ETH_IXIA_ONCE_TEST_SELECTED)
 
 /* ARPEN runs through the normal main.c RX flow, not the MAC control runner. */
 #define ETH_MAC_CTRL_TEST_SELECTED (ACTIVE_TEST >= TEST_MAC_CTRL_SARC && \
-                                    ACTIVE_TEST <= TEST_MTL_RXQ0_OVERFLOW)
+                                    ACTIVE_TEST <= TEST_DMA_CH0_PKT_TXRX)
 
 /* Queue cases use the queue runner. MAC control cases use eth_functions.c. */
 #define ETH_QUEUE_TEST_SELECTED (ACTIVE_TEST >= TEST_RMII_MTL_TX_STORE_FORWARD && \
@@ -57,7 +82,7 @@
 
 /*Select the test to execute*/
 #ifndef ACTIVE_TEST
-#define ACTIVE_TEST     20
+#define ACTIVE_TEST    43
 #endif
 
 #endif

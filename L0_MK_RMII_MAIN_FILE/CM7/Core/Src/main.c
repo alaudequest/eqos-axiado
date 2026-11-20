@@ -181,6 +181,40 @@ static uint8_t rx_buf[EQOS_RX_DESC_COUNT][EQOS_BUF_SIZE] __attribute__((aligned(
 /* Included after struct eqos_desc and the rings: the test uses descriptors. */
 #include "../../../0_test_cases/MTL_RXQ0_OVERFLOW.c"
 #endif
+#if ACTIVE_TEST == TEST_DMA_CH0_PKT_TXRX
+#include "../../../0_test_cases/DMA_CH0_PKT_TXRX.c"
+#endif
+#if ACTIVE_TEST == TEST_IXIA_DUT_TX || ACTIVE_TEST == TEST_IXIA_REFLECT
+#include "../../../0_test_cases/IXIA_PERF_TX_REFLECT.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_BAD_CRC
+#include "../../../0_test_cases/IXIA_RX_BAD_CRC.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_ALIGN_ERR
+#include "../../../0_test_cases/IXIA_RX_ALIGN_ERR.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_DRIBBLE
+#include "../../../0_test_cases/IXIA_RX_DRIBBLE.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_RUNT
+#include "../../../0_test_cases/IXIA_RX_RUNT.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_OVERSIZE
+#include "../../../0_test_cases/IXIA_RX_OVERSIZE.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_VLAN
+#include "../../../0_test_cases/IXIA_RX_VLAN.c"
+#elif ACTIVE_TEST == TEST_IXIA_TX_PAUSE
+#include "../../../0_test_cases/IXIA_TX_PAUSE.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_NO_CRC
+#include "../../../0_test_cases/IXIA_RX_NO_CRC.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_PREAMBLE
+#include "../../../0_test_cases/IXIA_RX_PREAMBLE.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_IFG
+#include "../../../0_test_cases/IXIA_RX_IFG.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_IP_CSUM_ERR
+#include "../../../0_test_cases/IXIA_RX_IP_CSUM_ERR.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_IP_CSUM_DROP
+#include "../../../0_test_cases/IXIA_RX_IP_CSUM_DROP.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_IP_LEN_ERR
+#include "../../../0_test_cases/IXIA_RX_IP_LEN_ERR.c"
+#elif ACTIVE_TEST == TEST_IXIA_RX_IP_FRAG
+#include "../../../0_test_cases/IXIA_RX_IP_FRAG.c"
+#endif
 
 /* These checks protect assumptions in the DMA configuration and wrap logic:
  * index = (index + 1) & (count - 1) requires a nonzero power-of-two ring count.
@@ -358,6 +392,34 @@ int main(void)
     printf("LAN8742 loopback setup failed: %ld\r\n", (long)status);
     Error_Handler();
   }
+#elif ETH_IXIA_TEST_SELECTED
+  /* Ixia cases: real link, auto-negotiation; MAC FES/DM follow the PHY result. */
+  status = LAN8742_StartAutoNego(&LAN8742);
+  if (status != LAN8742_STATUS_OK) {
+    printf("LAN8742 auto-negotiation start failed: %ld\r\n", (long)status);
+    Error_Handler();
+  }
+  {
+    const uint32_t aneg_t0 = HAL_GetTick();
+    do {
+      HAL_Delay(10U);
+      status = LAN8742_GetLinkState(&LAN8742);
+    } while ((status == LAN8742_STATUS_LINK_DOWN || status == LAN8742_STATUS_AUTONEGO_NOTDONE) &&
+             HAL_GetTick() - aneg_t0 < eth.cfg.aneg_timeout_ms);
+    printf("Link after %lu ms: ", (unsigned long)(HAL_GetTick() - aneg_t0));
+  }
+  if (status < LAN8742_STATUS_100MBITS_FULLDUPLEX || status > LAN8742_STATUS_10MBITS_HALFDUPLEX) {
+    printf("no link (LAN8742 state %ld)\r\n", (long)status);
+    Error_Handler();
+  }
+  eth.speed = (status == LAN8742_STATUS_100MBITS_FULLDUPLEX ||
+               status == LAN8742_STATUS_100MBITS_HALFDUPLEX) ? EQOS_SPEED_100 : EQOS_SPEED_10;
+  eth.duplex_full = (status == LAN8742_STATUS_100MBITS_FULLDUPLEX ||
+                     status == LAN8742_STATUS_10MBITS_FULLDUPLEX);
+  printf("%s Mbps %s duplex\r\n", eth.speed == EQOS_SPEED_100 ? "100" : "10",
+         eth.duplex_full ? "full" : "half");
+  eth.phy_addr = (int)LAN8742.DevAddr;
+  eth.link_up = true;
 #else
   /* Preserve the existing forced-speed MAC-loopback configuration. */
   status = LAN8742_SetLinkState(&LAN8742, LAN8742_STATUS_100MBITS_FULLDUPLEX);
@@ -607,6 +669,59 @@ int main(void)
 
   #endif
 
+  #if ETH_IXIA_TEST_SELECTED
+  /* Ixia cases: no MAC loopback, FES/DM already from the PHY. Never returns. */
+  mac_control &= ~EQOS_MAC_CFG_LM;
+  AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION,
+                      mac_control | EQOS_MAC_CFG_TE | EQOS_MAC_CFG_RE);
+  eth.started = true;
+  __DSB();
+  ETH->DMACTCR |= EQOS_DMA_CH_TX_ST;
+  ETH->DMACRCR |= EQOS_DMA_CH_RX_SR;
+  __DSB();
+  #if ETH_IXIA_ONCE_TEST_SELECTED
+  printf("Ixia case %u ready. Press USER once to run; reset to rerun.\r\n",
+         (unsigned int)ACTIVE_TEST);
+  send_requested = 0U;
+  while (send_requested == 0U) { }
+  send_requested = 0U;
+  #endif
+  #if ACTIVE_TEST == TEST_IXIA_DUT_TX
+  eth_test_ixia_dut_tx(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_REFLECT
+  eth_test_ixia_reflect(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_BAD_CRC
+  (void)eth_test_ixia_rx_bad_crc(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_ALIGN_ERR
+  (void)eth_test_ixia_rx_align_err(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_DRIBBLE
+  (void)eth_test_ixia_rx_dribble(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_RUNT
+  (void)eth_test_ixia_rx_runt(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_OVERSIZE
+  (void)eth_test_ixia_rx_oversize(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_VLAN
+  (void)eth_test_ixia_rx_vlan(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_TX_PAUSE
+  (void)eth_test_ixia_tx_pause(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_NO_CRC
+  (void)eth_test_ixia_rx_no_crc(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_PREAMBLE
+  (void)eth_test_ixia_rx_preamble(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_IFG
+  (void)eth_test_ixia_rx_ifg(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_IP_CSUM_ERR
+  (void)eth_test_ixia_rx_ip_csum_err(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_IP_CSUM_DROP
+  (void)eth_test_ixia_rx_ip_csum_drop(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_IP_LEN_ERR
+  (void)eth_test_ixia_rx_ip_len_err(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_IXIA_RX_IP_FRAG
+  (void)eth_test_ixia_rx_ip_frag(&eth, tx_desc, rx_desc, rx_buf);
+  #endif
+  while (1) { }
+  #endif
+
   #if ETH_MAC_CTRL_TEST_SELECTED
   /* MAC control cases run in internal MAC loopback at 100 Mbps full duplex. */
   mac_control |= EQOS_MAC_CFG_LM | EQOS_MAC_CFG_FES | EQOS_MAC_CFG_DM;
@@ -650,6 +765,8 @@ int main(void)
   (void)eth_test_mac_isr_mmc_tx(&eth, tx_desc, rx_desc, rx_buf);
   #elif ACTIVE_TEST == TEST_MTL_RXQ0_OVERFLOW
   (void)eth_test_mtl_rxq0_overflow(&eth, tx_desc, rx_desc, rx_buf);
+  #elif ACTIVE_TEST == TEST_DMA_CH0_PKT_TXRX
+  (void)eth_test_dma_ch0_pkt_txrx(&eth, tx_desc, rx_desc, rx_buf);
   #else
   #error "Selected MAC control case is not implemented yet"
   #endif
