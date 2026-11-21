@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PTP timestamp: mode 3</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1d1f;--muted:#5d636b;--line:#cdd0d5;--card:#ffffff;--accent:#0b63c5;--accent-bg:#e2eefb;
+--warn:#a8590a;--warn-bg:#fdf0d0;--ok:#157a3b;--ok-bg:#e0f3e6;--bad:#b3261e;--bad-bg:#fbe4e2;--code:#f0f1f3;--g:#6b3fb3;--g-bg:#efe8fb;--t:#0f766e;--t-bg:#dcf2ef}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:60px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:6px;align-items:center;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:13.5px;flex-wrap:wrap}
+.top .brand{font-weight:700;margin-right:12px;white-space:nowrap}
+.top a{padding:4px 12px;border-radius:99px;text-decoration:none;color:var(--fg);border:1px solid var(--line);white-space:nowrap}
+.top a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 80px;min-width:0}
+h1{font-size:28px;margin:0 0 6px;line-height:1.25}
+h2{font-size:21px;margin:48px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:26px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:15.5px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+.case{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:12px 18px;margin:18px 0}
+.case.drop{border-left-color:var(--bad)}
+.case h3{margin:4px 0 8px}
+.case pre{margin:4px 0;font-size:12.5px;line-height:1.4}
+.case .tag{display:inline-block;font-size:12.5px;padding:1px 9px;border-radius:99px;border:1px solid var(--line);margin-left:8px;vertical-align:middle;font-weight:500}
+.case .tag.p{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.case .tag.d{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.tip{border-left:4px solid var(--ok);background:var(--ok-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.warn{border-left:4px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.mem{border-left:4px solid var(--g);background:var(--g-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:15.5px}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.5;margin:10px 0}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-bg)}
+td.c{text-align:center}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.toc{columns:2;column-gap:28px;font-size:14px}
+.toc a{text-decoration:none}
+svg{width:100%;height:auto;display:block;margin:12px 0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+svg text{fill:var(--fg);font-size:13px}
+svg .m{fill:var(--muted);font-size:12px}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+svg .b{font-weight:700}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .reg{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.4}
+svg .mac{fill:var(--t-bg);stroke:var(--t);stroke-width:1.4}
+svg .okb{fill:var(--ok-bg);stroke:var(--ok);stroke-width:1.4}
+svg .badb{fill:var(--bad-bg);stroke:var(--bad);stroke-width:1.4}
+svg .byt{fill:var(--code);stroke:var(--line);stroke-width:1}
+svg .s{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1}
+svg .cc{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1}
+svg .ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+svg .ln2{stroke:var(--muted);stroke-width:1.1;fill:none;stroke-dasharray:4 3}
+@media (max-width:600px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="top"><span class="brand">MAC loopback</span>
+<a href="MAC_LOOPBACK_filter.html">Table filter (mode 1)</a><a href="MAC_LOOPBACK_burst.html">DMA burst (mode 2)</a><a class="on" href="#">PTP (mode 3)</a><a href="MAC_LOOPBACK_vlan_tag.html">VLAN tag (mode 4, 5)</a><a href="MAC_LOOPBACK_tso.html">TSO (mode 6)</a><a href="MAC_LOOPBACK_coe.html">Checksum (mode 7)</a><a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a><a href="MAC_LOOPBACK_sa_cpc.html">SA / CRC (mode 10)</a><a href="MAC_LOOPBACK_addr_filter.html">Address filter (mode 11)</a><a href="MAC_LOOPBACK_istat.html">Interrupts: status (mode 12)</a></div>
+<main>
+<h1>PTP timestamp: the MAC stamps the time on frames (mode 3)</h1>
+<p class="lead">Cheat sheet for <code>eth_run_test_ops = 3</code> (<code>eth_mac_ptp_lb</code>, file <code>eth_ptp_functions.c</code>). STM32H755, RM0399 Rev 4. The two-step part ran on the board on 2026-11-06 (7/7); the one-step part was written later and has no log in the repo yet.</p>
+
+<div class="mem"><b>Mnemonic:</b> <i>The MAC has its own clock (system time). With TTSE set, when the frame's SFD passes the MII the MAC copies the time into TDES0/1; with TSENALL set, every received frame is followed by a context descriptor holding the time. One-step: add an OSTC context before the Sync, and the MAC fills the time into bytes 48..57 of the frame by itself.</i></div>
+
+<div class="card toc">
+<a href="#idea">1. What mode 3 tests</a><br>
+<a href="#init">2. System time and mac_ptp_init</a><br>
+<a href="#two">3. The two-step path: TTSE, TTSS, RX context</a><br>
+<a href="#sync">4. Sync frame and master mode</a><br>
+<a href="#run">5. How one frame / one ost_case runs</a><br>
+<a href="#log">6. Reading the log table</a><br>
+<a href="#cases">7. Each check, one at a time</a><br>
+<a href="#lessons">8. Lessons from the board</a><br>
+<a href="#regs">9. Bit table for lookup</a><br>
+<a href="#todo">10. Cases worth adding</a>
+</div>
+
+<h2 id="idea">1. What mode 3 tests</h2>
+<p>IEEE 1588 (PTP) synchronises clocks between machines by recording <b>exactly when</b> a frame leaves and arrives. Software cannot do this accurately enough (interrupts, cache, queues), so the MAC has a timestamp block (RM0399 §61.5, programming guide §61.9.9 p.3036): a time counter driven by the PTP clock (= HCLK on the H755, p.2936) and a capture circuit right at the MII. Mode 3 only asks the hardware three questions: is the counter running, are the TX and RX times written into the descriptors, and are those two times consistent with each other. No PTP protocol, no conversion to ns.</p>
+<svg viewBox="0 0 960 330" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<rect x="20" y="20" width="250" height="78" rx="8" class="reg"/>
+<text x="145" y="44" text-anchor="middle" class="b">System time (PTP counter)</text>
+<text x="145" y="64" text-anchor="middle" class="mono">ETH_MACSTSR : seconds</text>
+<text x="145" y="82" text-anchor="middle" class="mono">ETH_MACSTNR : + SSINC every HCLK tick</text>
+
+<rect x="330" y="20" width="300" height="78" rx="8" class="mac"/>
+<text x="480" y="44" text-anchor="middle" class="b">MAC (loopback LM = 1)</text>
+<text x="480" y="64" text-anchor="middle" class="m">SFD passes the MII at the transmitter: TX time captured</text>
+<text x="480" y="82" text-anchor="middle" class="m">SFD re-enters the receiver: RX time captured</text>
+
+<path d="M270 59 H328" class="ln" marker-end="url(#a)"/>
+<text x="299" y="52" text-anchor="middle" class="m">read time</text>
+
+<rect x="20" y="150" width="280" height="110" rx="8" class="box"/>
+<text x="160" y="172" text-anchor="middle" class="b">TX descriptor of the frame</text>
+<text x="30" y="194" class="mono">sent : TDES2.TTSE [30] = 1</text>
+<text x="30" y="212" class="mono">back : TDES3.TTSS [17] = 1</text>
+<text x="30" y="230" class="mono">      TDES0 = sub-second, TDES1 = sec</text>
+<text x="30" y="250" class="m">eth_tx_ts (egress_packet)</text>
+
+<rect x="340" y="150" width="280" height="110" rx="8" class="box"/>
+<text x="480" y="172" text-anchor="middle" class="b">RX descriptor of the frame</text>
+<text x="350" y="194" class="mono">RDES1.TSA [14] = 1: time available, see</text>
+<text x="350" y="212" class="mono">the NEXT descriptor</text>
+<text x="350" y="230" class="mono">RDES3.RS1V = 1, LD = 1</text>
+<text x="350" y="250" class="m">ingress_packet_status</text>
+
+<rect x="660" y="150" width="280" height="110" rx="8" class="cc"/>
+<text x="800" y="172" text-anchor="middle" class="b">Context descriptor (RX)</text>
+<text x="670" y="194" class="mono">RDES3.CTXT [30] = 1, OWN = 0</text>
+<text x="670" y="212" class="mono">RDES0 = RTSL sub-second</text>
+<text x="670" y="230" class="mono">RDES1 = RTSH seconds</text>
+<text x="670" y="250" class="m">eth_rx_ts (ingress_context)</text>
+
+<path d="M400 98 V148" class="ln" marker-end="url(#a)"/>
+<text x="408" y="128" class="m">frame returns (loopback)</text>
+<path d="M360 98 L160 148" class="ln" marker-end="url(#a)"/>
+<text x="215" y="118" class="m">TX time written back</text>
+<path d="M560 98 L800 148" class="ln" marker-end="url(#a)"/>
+<text x="700" y="118" class="m">RX time written after the frame</text>
+<path d="M620 205 H658" class="ln2" marker-end="url(#a)"/>
+
+<rect x="20" y="285" width="920" height="32" rx="6" class="okb"/>
+<text x="480" y="306" text-anchor="middle">Checks: identical frame · both times present · RX ≥ TX · TX rises per frame · system time runs. Board 2026-11-06: RX − TX = 99 ticks at every length.</text>
+</svg>
+<p>Part two (added after the 11-06 log): <b>one-step</b>. With two-step, the master sends Sync and then has to send a Follow_Up carrying the time read from TDES0/1. With one-step the MAC fills the time straight into the Sync as it goes out (p.2983-2985), and the CPU no longer sends Follow_Up. The test sends an OSTC context descriptor, then a Sync with originTimestamp = 0, and looks at bytes 48..57 of the returned frame.</p>
+<svg viewBox="0 0 960 230" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<rect x="20" y="20" width="270" height="90" rx="8" class="cc"/>
+<text x="155" y="42" text-anchor="middle" class="b">1. Context descriptor (TX)</text>
+<text x="30" y="64" class="mono">TDES3 = OWN | CTXT | OSTC [27]</text>
+<text x="30" y="82" class="mono">        | TCMSSV [26]</text>
+<text x="30" y="100" class="m">egress_context_ost(0, 0): tail not written yet</text>
+
+<rect x="330" y="20" width="270" height="90" rx="8" class="box"/>
+<text x="465" y="42" text-anchor="middle" class="b">2. Sync frame 60 byte</text>
+<text x="340" y="64" class="mono">type 88 F7, msg 0 = Sync, ver 2</text>
+<text x="340" y="82" class="mono">byte 48..57 originTimestamp = 0</text>
+<text x="340" y="100" class="m">egress_packet, TTSE = 1 for comparison</text>
+
+<rect x="640" y="20" width="300" height="90" rx="8" class="mac"/>
+<text x="790" y="42" text-anchor="middle" class="b">3. MAC master (ETH_MACTSCR)</text>
+<text x="650" y="64" class="mono">TSIPENA TSVER2ENA TSEVNTENA</text>
+<text x="650" y="82" class="mono">TSMSTRENA, SNAPTYPSEL = 00</text>
+<text x="650" y="100" class="m">Sync goes out: time filled into bytes 48..57</text>
+
+<path d="M290 65 H328" class="ln" marker-end="url(#a)"/>
+<path d="M600 65 H638" class="ln" marker-end="url(#a)"/>
+
+<rect x="20" y="140" width="920" height="70" rx="8" class="okb"/>
+<text x="480" y="162" text-anchor="middle" class="b">4. Frame returns via loopback: bytes 50..53 = seconds, 54..57 = sub-second written by the MAC</text>
+<text x="480" y="182" text-anchor="middle">Checks: the rest identical · origin ≠ 0 · origin seconds = TX timestamp seconds (or + 1) · context closed without CDE</text>
+<text x="480" y="200" text-anchor="middle" class="m">No board log in the repo for this part yet (section 8)</text>
+</svg>
+<p>Three things mode 3 deliberately keeps simple: coarse update (SSINC added directly every tick), SSINC = 1 (sub-second is a raw tick count), binary rollover (seconds only step after 2³¹ ticks). So every printed value is <b>a count of HCLK ticks</b>, not real seconds/nanoseconds; section 10 explains how a real driver does it.</p>
+
+<h2 id="init">2. System time and mac_ptp_init (p.3036 steps 1..4)</h2>
+<p><code>mac_ptp_init</code> runs after <code>mac_init_100m</code> and before <code>mac_start</code> (TE/RE enabled afterwards): the RM requires the counter to be started before any frame.</p>
+<table>
+<tr><th>Step</th><th>Register</th><th>Bit</th><th>Value written</th><th>Why</th><th>RM</th></tr>
+<tr><td>1</td><td>ETH_MACTSCR</td><td>TSENA [0] = 1</td><td>0x00000001</td><td>enable the timestamp block: the counter starts running, frames can be timestamped</td><td>p.3176</td></tr>
+<tr><td>1</td><td>ETH_MACTSCR</td><td>TSCFUPDT [1] = 0</td><td></td><td>coarse update: every PTP clock tick adds SSINC directly to sub-second (fine update also needs the addend ETH_MACTSAR)</td><td>p.3176</td></tr>
+<tr><td>1</td><td>ETH_MACTSCR</td><td>TSCTRLSSR [9] = 0</td><td></td><td>binary rollover: sub-second counts 0..0x7FFFFFFF before the seconds step (digital rollover = 0..999 999 999)</td><td>p.3176</td></tr>
+<tr><td>2</td><td>ETH_MACSSIR</td><td>SSINC [23:16] = 1</td><td>0x00010000</td><td>add 1 per tick: sub-second is a raw tick counter, not ns. PTP clock = HCLK (p.2936)</td><td>p.3178</td></tr>
+<tr><td>3</td><td>ETH_MACSTSUR</td><td>TSS [31:0] = 0</td><td>0x00000000</td><td>initial value, seconds</td><td>p.3181</td></tr>
+<tr><td>3</td><td>ETH_MACSTNUR</td><td>TSSS [30:0] = 0</td><td>0x00000000</td><td>initial value, sub-second</td><td>p.3181</td></tr>
+<tr><td>4</td><td>ETH_MACTSCR</td><td>TSINIT [2] = 1</td><td>0x00000005</td><td>load STSUR/STNUR into the counter; the bit self-clears, the code waits up to 1000 µs before moving on</td><td>p.3176</td></tr>
+<tr><td>5</td><td>ETH_MACTSCR</td><td>TSENALL [8] = 1</td><td>0x00000101</td><td>timestamp EVERY received frame, PTP or not: after each frame the DMA writes an extra context descriptor</td><td>p.3176</td></tr>
+<tr><td>—</td><td>ETH_MACIER</td><td>TSIE = 0</td><td>reset</td><td>no interrupts used, the test only polls descriptors</td><td>p.3133</td></tr>
+</table>
+
+<div class="tip">Order matters: write STSUR/STNUR <b>first</b>, then set TSINIT; and wait for TSINIT to self-clear before writing ETH_MACTSCR again (the code waits at most 1000 µs; on timeout it returns 0 and the mode FAILs). Writing TSENALL together with TSINIT also works, but the code splits them so FLOW is easier to read.</div>
+<p>Reading the time (<code>ptp_read_time</code>): seconds, sub-second, then seconds again; if the two seconds reads differ, read again (p.3180). The read is not atomic, so without this the time can be wrong by exactly one second.</p>
+
+<h2 id="two">3. The two-step path: TX into TDES0/1, RX into a context descriptor</h2>
+<h3>Transmitter</h3>
+<table>
+<tr><th>Descriptor</th><th>Bit</th><th>Meaning</th><th>RM</th></tr>
+<tr><td>TDES2 (sent)</td><td>TTSE [30] = 1</td><td>request a timestamp for this frame. egress_packet sets it when eth_ptp_on = 1</td><td>p.3050</td></tr>
+<tr><td>TDES3 (back)</td><td>TTSS [17] = 1</td><td>time written; OWN = 0. eth_tx_ts.valid = (OWN = 0 and TTSS = 1)</td><td>p.3054</td></tr>
+<tr><td>TDES0 (back)</td><td>TTSL [31:0]</td><td>sub-second of the TX time (here: a tick count)</td><td>p.3054</td></tr>
+<tr><td>TDES1 (back)</td><td>TTSH [31:0]</td><td>seconds of the TX time</td><td>p.3054</td></tr>
+</table>
+
+<p><code>egress_packet</code> sets TTSE when <code>eth_ptp_on = 1</code>; after polling OWN = 0 it reads TDES3.TTSS and copies TDES0/1 into <code>eth_tx_ts</code>. The TX time overwrites TDES0/1 (which held the buffer address before): the time only exists once the descriptor is done, so the code must read it before reusing the descriptor.</p>
+<h3>Receiver</h3>
+<table>
+<tr><th>Register / descriptor</th><th>Bit</th><th>Meaning</th><th>RM</th></tr>
+<tr><td>ETH_MACTSCR</td><td>TSENALL [8] = 1</td><td>every received frame gets timestamped</td><td>p.3176</td></tr>
+<tr><td>RDES1 (frame)</td><td>TSA [14] = 1</td><td>time available: the next descriptor is a context. TD [15] = 1: the time was dropped because the FIFO was full</td><td>p.3066</td></tr>
+<tr><td>RDES3 (frame)</td><td>RS1V [10] = 1, LD [28] = 1</td><td>RDES1 valid and this is the frame's last descriptor: only then does the code look for the context</td><td>p.3069</td></tr>
+<tr><td>RDES3 (context)</td><td>CTXT [30] = 1, OWN [31] = 0</td><td>the next descriptor is a context, not a frame. If ingress_packet_status sees CTXT it returns −4</td><td>p.3072</td></tr>
+<tr><td>RDES0 (context)</td><td>RTSL [31:0]</td><td>sub-second of the RX time</td><td>p.3072</td></tr>
+<tr><td>RDES1 (context)</td><td>RTSH [31:0]</td><td>seconds. Both = 0xFFFFFFFF: corrupt time, valid = 0</td><td>p.3073</td></tr>
+</table>
+
+<p>Sequence in <code>ingress_packet_status</code>: the frame arrives in rx_desc[n] → copy, hand the descriptor back to the DMA → if eth_ptp_on and RDES3.LD, RS1V and RDES1.TSA = 1, call <code>ingress_context</code>: wait for rx_desc[n+1] to have OWN = 0 and CTXT = 1, copy RDES0/1 into <code>eth_rx_ts</code>, hand that descriptor back too. If it meets CTXT while PTP is off, ingress_packet_status returns −4 (not a frame).</p>
+<div class="warn">TSENALL = 1 means <b>every</b> frame costs two RX descriptors. A ring of 8 descriptors can only hold 4 unread frames. A real driver enables TSIPENA + TSEVNTENA so only PTP frames get a context (section 10, P4).</div>
+
+<h2 id="sync">4. Sync frame and master mode (one-step)</h2>
+<pre>60-byte Sync frame (PTP over Ethernet, IEEE 1588-2008), sent with originTimestamp = 0:
+  [ 0.. 5] DA  6C 1F F7 CA 2B FD        [ 6..11] SA  00 80 E1 00 00 00
+  [12..13] EtherType       88 F7        PTP over Ethernet (TSIPENA)
+  [14]     messageType     00           transportSpecific 0, Sync = 0
+  [15]     versionPTP      02           TSVER2ENA
+  [16..17] messageLength   00 2C        44-byte header + originTimestamp
+  [18]     domainNumber    00
+  [20..21] flagField       00 00        bit 1 of byte 20 twoStepFlag = 0: one-step
+  [22..29] correctionField 00 x 8       the MAC may touch it (Table 564: "subnanosecond correction")
+  [34..43] sourcePortIdentity  SA + 00 01   clockIdentity + port 1
+  [44..45] sequenceId      00 01 / 00 02
+  [46]     controlField    00           Sync
+  [47]     logMessageInterval 00
+  [48..53] originTimestamp seconds (48 bit)       <- written by the MAC with OSTC
+  [54..57] originTimestamp nanoseconds (32 bit)  <- written by the MAC with OSTC
+  [58..59] pad</pre>
+<p>So the MAC recognises this as a Sync that needs its time filled in, <code>ptp_one_step</code> adds these bits to ETH_MACTSCR (value after the write: 0x0000CD01):</p>
+<table>
+<tr><th>Bit</th><th>Value</th><th>Why</th><th>RM</th></tr>
+<tr><td>TSVER2ENA [10]</td><td>1</td><td>PTP version 2 header</td><td>p.3177</td></tr>
+<tr><td>TSIPENA [11]</td><td>1</td><td>recognise PTP over Ethernet (EtherType 0x88F7); PTP over UDP needs TSIPV4ENA/TSIPV6ENA</td><td>p.3177</td></tr>
+<tr><td>TSEVNTENA [14]</td><td>1</td><td>event messages only (Sync, Delay_Req, Pdelay_*), not general messages</td><td>p.3177</td></tr>
+<tr><td>TSMSTRENA [15]</td><td>1</td><td>master side: the message to process is Sync (slave: Delay_Req)</td><td>p.3177</td></tr>
+<tr><td>SNAPTYPSEL [17:16]</td><td>00</td><td>together with the two bits above = the "Ordinary or Boundary Master" row of Table 564: Sync gets captured / filled in</td><td>p.2983</td></tr>
+<tr><td>ETH_MACHWF1R.OSTEN [11]</td><td>reads 1</td><td>the core has one-step; = 0 and the test skips this part (no FAIL). POUOST [23] = 0: no one-step for PTP over UDP</td><td>p.3145</td></tr>
+<tr><td>TDES3 context OSTC [27] + TCMSSV [26]</td><td>1</td><td>the frame AFTER this context gets its time filled in. TDES0/1 = ingress timestamp (a slave uses it for Delay_Resp), the master leaves 0</td><td>p.3058-3060</td></tr>
+</table>
+
+<p>Table 564 p.2983 is the lookup table: the SNAPTYPSEL / TSMSTRENA / TSEVNTENA columns tell which message gets captured. 00 / 1 / 1 = master, event: Sync. Changing TSMSTRENA = 0 makes it a slave: Delay_Req. SNAPTYPSEL = 01 captures every event message, 10 adds Pdelay.</p>
+
+<h2 id="run">5. How one frame / one ost_case runs</h2>
+<h3>ptp_run_frame (7 times, len = 60, 64, 128, 256, 512, 1024, 1514)</h3>
+<table>
+<tr><th>Step</th><th>What it does</th><th>Register / variable</th></tr>
+<tr><td>1</td><td>build the frame DA | SA | 88 B5 | payload 0x10.. (as in mode 0)</td><td>frame[]</td></tr>
+<tr><td>2</td><td>send, TTSE = 1</td><td>egress_packet → eth_tx_ts (TDES0/1, valid if TTSS)</td></tr>
+<tr><td>3</td><td>receive the frame, then the context</td><td>ingress_packet_status → rxbuf, eth_rx_ts</td></tr>
+<tr><td>4</td><td>compare the frame, keep both times</td><td>struct ptp_result: tx, rx, same, tts, rts</td></tr>
+<tr><td>5</td><td>after 7 frames: table + 4 counts, then read the system time a second time</td><td>ptp_print_results, ptp_read_time</td></tr>
+</table>
+
+<p>Frames 1..FLOW_PKT_MAX print FLOW [10]/[11] in full (including the context descriptor line); later frames only print a dot.</p>
+<h3>ost_case (2 times)</h3>
+<table>
+<tr><th>Step</th><th>What it does</th><th>Register / variable</th></tr>
+<tr><td>1</td><td>build the Sync, seq = 1 / 2</td><td>ost_build_sync</td></tr>
+<tr><td>2</td><td>ctx = 1: OSTC context descriptor (TDES0/1 = 0, no tail write)</td><td>egress_context_ost(0, 0) → ctx_idx</td></tr>
+<tr><td>3</td><td>send the Sync with TTSE, keep the TX ts and the context's TDES3 write-back</td><td>egress_packet, tx_desc[ctx_idx].des3</td></tr>
+<tr><td>4</td><td>receive; read bytes 50..53 (seconds), 54..57 (ticks), 22..29 (corr)</td><td>ost_be</td></tr>
+<tr><td>5</td><td>compare the rest: 0..21, 30..47, 58..59</td><td>same</td></tr>
+<tr><td>6</td><td>grade: same, tts.valid, origin ≠ 0, orig_s = tts.s or + 1, context OWN = 0 and CDE = 0</td><td>ok (only ctx = 1 counts)</td></tr>
+</table>
+
+<p>Why compare with the TX ts of the same frame: both are taken from the system time as the Sync goes out, only a few ticks apart, so the seconds must be equal (unless a rollover lands right in between, so + 1 is allowed). Bytes 22..29 (correctionField) are not graded: Table 564 says the MAC may write the sub-ns part there.</p>
+
+<h2 id="log">6. Reading the log table</h2>
+<p>The real table from the board on 2026-11-06 (log <code>COM3_2026_11_06.18.53.35.423.txt</code>):</p>
+<pre>   len   TX s  TX sub       RX s  RX sub       RX-TX sub  data
+    60      0  0x022A0BD2      0  0x022A0C35          99  SAME
+    64      0  0x022A80C6      0  0x022A8129          99  SAME
+   128      0  0x022B03EC      0  0x022B044F          99  SAME
+   256      0  0x022BAE86      0  0x022BAEE9          99  SAME
+   512      0  0x022CA765      0  0x022CA7C8          99  SAME
+  1024      0  0x022E3C83      0  0x022E3CE6          99  SAME
+  1514      0  0x023095F1      0  0x02309654          99  SAME
+
+Result: data SAME 7/7, both timestamps 7/7, RX >= TX 7/7, TX increasing 7/7
+System time ETH_MACSTSR / ETH_MACSTNR: 0 / 0x02209893 before the frames, 0 / 0x0232A787 after: counting</pre>
+<p>One-step lines (no log yet; the format the code prints):</p>
+<pre>  1  ctx OSTC    origin s    0 ns 0x........ | TX ts s    0 ns 0x........ | corr 0000000000000000 | rest SAME | ctx 0x30000000 | OK   context OSTC: the MAC fills originTimestamp of the Sync
+  2  no ctx      origin s    0 ns 0x........ | TX ts s    0 ns 0x........ | corr 0000000000000000 | rest SAME | ctx -          | written / left 0   no new context: does OSTC stay valid ...</pre><table>
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td>len</td><td>length of the sent frame (no FCS), 7 sizes from 60 to 1514</td></tr>
+<tr><td>TX s / TX sub</td><td>TDES1 / TDES0 after write-back, printed only when TTSS = 1. sub = tick count (SSINC = 1), printed in hex</td></tr>
+<tr><td>RX s / RX sub</td><td>RDES1 / RDES0 of the context descriptor that follows the frame</td></tr>
+<tr><td>RX-TX sub</td><td>RX sub − TX sub, decimal; same second, so a plain subtraction. Negative or 'RX before TX' is BAD</td></tr>
+<tr><td>data</td><td>SAME: the frame came back identical; DIFF: it differs</td></tr>
+<tr><td>Result</td><td>four counts /7; one short means FAIL. System time line: STSR/STNR read before and after the 7 frames, must be 'counting'</td></tr>
+<tr><td>One-step line</td><td>origin = bytes 50..53 / 54..57 of the received Sync; TX ts = TDES1/TDES0 of that same Sync; corr = bytes 22..29; rest = everything else; ctx = the context's TDES3 write-back (0x30000000 = OWN 0, CDE 0)</td></tr>
+</table>
+
+<p>A few calculations from the real table: 0x022A0C35 − 0x022A0BD2 = 0x63 = 99 ticks; if HCLK = 224 MHz then 99 / 224 000 000 ≈ 0.44 µs. The total test time 0x0232A787 ≈ 36.9 million ticks ≈ 0.165 s, so the seconds stay 0 (one binary 'second' = 2³¹ ticks ≈ 9.6 s).</p>
+
+<h2 id="cases">7. Each check, one at a time</h2>
+<p>Mode 3 has no A, B, C case table like the other modes: 7 identical frames, graded by 4 counts + system time; then 2 Syncs for one-step. The cards below follow exactly those counts.</p>
+<div class="case" id="cT1"><h3>T1: 7 frames come back identical (data SAME) <span class="tag p">7/7</span></h3>
+<table><tr><th style="width:150px">Check</th><td>rx_len = len and memcmp = 0, as in mode 0</td></tr>
+<tr><th style="width:150px">Why</th><td>two-step timestamping touches no byte of the frame: the time lives in the descriptor, not in the frame</td></tr>
+<tr><th style="width:150px">Board 11-06</th><td>SAME 7/7, MMC RX unicast good 7, TX good 7</td></tr>
+</table></div>
+
+<div class="case" id="cT2"><h3>T2: both times present (both timestamps) <span class="tag p">7/7</span></h3>
+<table><tr><th style="width:150px">Check</th><td>eth_tx_ts.valid (TDES3 OWN = 0 and TTSS = 1) and eth_rx_ts.valid (context returned, RTSL/RTSH ≠ 0xFFFFFFFF)</td></tr>
+<tr><th style="width:150px">Why</th><td>TTSE = 1 in every TDES2 and TSENALL = 1, so every frame gets both times. Without TSA, ingress_packet_status does not look for the context and valid = 0</td></tr>
+<tr><th style="width:150px">Watch for</th><td>order in the RX ring: frame in rx_desc[n], context in rx_desc[n+1]. The ingress_context loop waits for OWN = 0 on the next descriptor, shared timeout ETH_TEST_RX_TIMEOUT_US</td></tr>
+</table></div>
+
+<div class="case" id="cT3"><h3>T3: RX ≥ TX <span class="tag p">7/7</span></h3>
+<table><tr><th style="width:150px">Check</th><td>ptp_after(tts, rts) or equal</td></tr>
+<tr><th style="width:150px">Why</th><td>the frame must leave the transmitter before it enters the receiver; same counter, so the RX time cannot be smaller</td></tr>
+<tr><th style="width:150px">Board 11-06</th><td>RX − TX = 99 ticks at all 7 frame sizes. Both times are captured when the SFD passes the MII (start of frame), so frame length has no effect; 99 ticks is the fixed delay transmit → loopback → receive. If HCLK = 224 MHz (eth_stm32_init): 99 / 224 MHz ≈ 0.44 µs</td></tr>
+<tr><th style="width:150px">Watch for</th><td>if the difference changed with length, the RX time would have been captured at the end of the frame, contrary to the RM. Here it is constant: matches the RM</td></tr>
+</table></div>
+
+<div class="case" id="cT4"><h3>T4: TX time increases frame after frame <span class="tag p">7/7</span></h3>
+<table><tr><th style="width:150px">Check</th><td>tts of frame i is after tts of frame i − 1</td></tr>
+<tr><th style="width:150px">Why</th><td>the counter only runs forward; frames are sent one after another. Board: 60 → 64 are 0x74F4 = 29 940 ticks apart ≈ 134 µs (log printing + polling), increasing up to 1514</td></tr>
+<tr><th style="width:150px">Watch for</th><td>seconds stay = 0 throughout the test: binary rollover, one 'second' here = 2³¹ ticks ≈ 9.6 s at HCLK 224 MHz. The test runs ~0.17 s (0x0232A787 ticks)</td></tr>
+</table></div>
+
+<div class="case" id="cT5"><h3>T5: system time is running <span class="tag p">counting</span></h3>
+<table><tr><th style="width:150px">Check</th><td>ptp_read_time before and after the 7 frames: (s1, sub1) after (s0, sub0). Reads seconds – sub-second – seconds, repeating if the seconds changed in between (p.3180)</td></tr>
+<tr><th style="width:150px">Board 11-06</th><td>0 / 0x02209893 → 0 / 0x0232A787: counting</td></tr>
+<tr><th style="width:150px">Watch for</th><td>if it is not running, TSENA is not enabled or TSINIT has not cleared; the code already printed a warning in mac_ptp_init</td></tr>
+</table></div>
+
+<div class="case" id="cO1"><h3>O1: OSTC context + Sync: the MAC fills in originTimestamp <span class="tag p">waiting for board</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACTSCR |= TSVER2ENA | TSIPENA | TSEVNTENA | TSMSTRENA = 0x0000CD01 (TSENA, TSENALL kept). egress_context_ost(0, 0) then egress_packet(Sync) with TTSE</td></tr>
+<tr><th style="width:150px">Frame sent</th><td>60-byte Sync, bytes 48..57 = 0 (section 4)</td></tr>
+<tr><th style="width:150px">Received frame (expected)</th><td>bytes 0..21, 30..47, 58..59 identical; bytes 50..53 = system seconds (0), 54..57 = ticks ≠ 0 and close to the TX ts of the same frame; bytes 22..29 may be modified by the MAC (corr)</td></tr>
+<tr><th style="width:150px">Why</th><td>p.2983 Table 564: master + event + SNAPTYPSEL 00 → Sync is the processed message; p.2985: with OSTC = 1 the MAC writes the system time into the originTimestamp field as the frame goes out (one-step), no Follow_Up from the CPU needed</td></tr>
+<tr><th style="width:150px">Grading</th><td>ok = rest SAME && tts.valid && origin ≠ 0 && (orig_s = tts.s or tts.s + 1) && the context's TDES3 comes back with OWN = 0, CDE = 0. BAD here makes mode 3 FAIL</td></tr>
+<tr><th style="width:150px">Watch for</th><td>origin ns is raw ticks (SSINC = 1), not ns: a real driver must configure SSINC = ns per tick (section 10). FCS: the MAC recomputes it after filling in the time, so the returned frame's CRC is still correct</td></tr>
+</table></div>
+
+<div class="case" id="cO2"><h3>O2: second Sync without a new context <span class="tag p">info</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>like O1 but without egress_context_ost; sequenceId = 2</td></tr>
+<tr><th style="width:150px">Question</th><td>Does OSTC in the previous context still apply to the next frame, or does every one-step frame need its own context? The line prints 'written' / 'left 0', not graded</td></tr>
+<tr><th style="width:150px">Why</th><td>RM p.3058 says a context keeps its values for later frames (like VLAN VT, MSS); for OSTC it is unclear, so measure it. Mode 6 already showed MSS 'last write wins'</td></tr>
+</table></div>
+
+
+<h2 id="lessons">8. Lessons from the board</h2>
+<p>Two-step: log 2026-11-06, every count 7/7. One-step: added to the code after that date, not run yet; once there is a log, fill in O1 (OK/BAD, the origin value compared with the TX ts, whether corr was modified) and O2 ('written' or 'left 0').</p>
+<table>
+<tr><th>Date</th><th>Case</th><th>Observed</th><th>Takeaway</th><th>Code change</th></tr>
+<tr><td>2026-11-06</td><td>T1..T5</td><td>7/7 on all four counts; RX − TX = 99 ticks constant; system time 0x02209893 → 0x0232A787</td><td>timestamp taken at SFD, fixed loopback delay ≈ 0.44 µs if HCLK is 224 MHz; coarse update with SSINC = 1 works correctly</td><td>no</td></tr>
+<tr><td>2026-11-06</td><td>T2</td><td>the context descriptor comes right after the frame, RDES3 = CTXT, RDES0/1 ≠ 0xFFFFFFFF</td><td>TSENALL = 1 costs one RX descriptor per frame: a ring of 8 holds only 4 unread frames; a real driver should only timestamp PTP (section 10)</td><td>no</td></tr>
+<tr><td colspan="5" class="c">waiting for the board: O1, O2 (one-step, added after 11-06)</td></tr>
+</table>
+
+<h2 id="regs">9. Bit table for lookup</h2>
+<table>
+<tr><th>Register / descriptor</th><th>Bit</th><th>Used in</th><th>RM</th></tr>
+<tr><td>ETH_MACTSCR 0x0B00</td><td>TSENA [0], TSCFUPDT [1], TSINIT [2], TSUPDT [3], TSADDREG [5], TSENALL [8], TSCTRLSSR [9], TSVER2ENA [10], TSIPENA [11], TSEVNTENA [14], TSMSTRENA [15], SNAPTYPSEL [17:16], TXTSSTSM [24]</td><td>mac_ptp_init, ptp_one_step</td><td>p.3176-3177</td></tr>
+<tr><td>ETH_MACSSIR 0x0B04</td><td>SSINC [23:16], SNSINC [15:8] (fine)</td><td>mac_ptp_init</td><td>p.3178</td></tr>
+<tr><td>ETH_MACSTSR / STNR 0x0B08 / 0x0B0C</td><td>TSS [31:0] / TSSS [30:0] (read)</td><td>ptp_read_time</td><td>p.3180</td></tr>
+<tr><td>ETH_MACSTSUR / STNUR 0x0B10 / 0x0B14</td><td>TSS [31:0] / ADDSUB [31] + TSSS [30:0] (write, with TSINIT / TSUPDT)</td><td>mac_ptp_init</td><td>p.3181</td></tr>
+<tr><td>ETH_MACTSAR 0x0B18</td><td>TSAR [31:0] addend for fine update</td><td>not used yet</td><td>p.3182</td></tr>
+<tr><td>ETH_MACTSSR 0x0B20</td><td>TSSOVF [0], AUXTSTRIG [2], TXTSSIS [15] ...</td><td>not used yet</td><td>p.3183</td></tr>
+<tr><td>ETH_MACHWF1R</td><td>OSTEN [11], POUOST [23]</td><td>ptp_one_step</td><td>p.3145</td></tr>
+<tr><td>TDES2 (sent)</td><td>TTSE [30]</td><td>egress_packet</td><td>p.3050</td></tr>
+<tr><td>TDES3 (back) / TDES0 / TDES1</td><td>TTSS [17] / TTSL / TTSH</td><td>egress_packet → eth_tx_ts</td><td>p.3054</td></tr>
+<tr><td>TDES3 context</td><td>CTXT [30], OSTC [27], TCMSSV [26], CDE [23] (back)</td><td>egress_context_ost</td><td>p.3058-3060</td></tr>
+<tr><td>RDES1 (frame)</td><td>TSA [14], TD [15]</td><td>ingress_packet_status</td><td>p.3066</td></tr>
+<tr><td>RDES3 (context) / RDES0 / RDES1</td><td>CTXT [30], OWN [31] / RTSL / RTSH</td><td>ingress_context → eth_rx_ts</td><td>p.3072-3073</td></tr>
+</table>
+
+<h2 id="todo">10. Cases worth adding</h2>
+<table>
+<tr><th>Case</th><th>Try</th><th>Expected</th></tr>
+<tr><td>P1</td><td>SSINC in ns: HCLK 224 MHz → 1 tick ≈ 4.46 ns; coarse only accepts integers, so set SSINC = 4 or 5 and compare against a timer</td><td>sub-second ≈ real ns; the accumulated error becomes visible after 1 s</td></tr>
+<tr><td>P2</td><td>fine update: TSCFUPDT = 1, SSINC = 20 ns for example, ETH_MACTSAR = 2³² × 20 ns × HCLK⁻¹ … (p.3036 step 5), TSADDREG</td><td>system time runs exactly 1 s per 1 s even though HCLK does not divide evenly</td></tr>
+<tr><td>P3</td><td>digital rollover TSCTRLSSR = 1</td><td>STNR counts 0..999 999 999 then seconds + 1; easier to read than 2³¹</td></tr>
+<tr><td>P4</td><td>drop TSENALL, enable TSIPENA + TSEVNTENA: timestamp PTP only</td><td>a 0x88B5 frame gets no context (RDES1.TSA = 0), a 0x88F7 Sync does</td></tr>
+<tr><td>P5</td><td>TSUPDT adds / subtracts time (ADDSUB), read back</td><td>the time jumps by exactly that amount; how a slave corrects its offset</td></tr>
+<tr><td>P6</td><td>O2 gives the answer: if 'left 0', every one-step Sync needs its own context; if 'written', one context serves many frames</td><td>record it in section 8, fix the egress_context_ost comment</td></tr>
+<tr><td>P7</td><td>PPS output (ETH_MACPPSCR, p.3188) + auxiliary snapshot (ETH_MACACR, p.3185): the H755 has 1 PPS, 4 aux</td><td>a 1 Hz pulse on the PPS pin; snapshot into ETH_MACATSNR/ATSSR</td></tr>
+<tr><td>P8</td><td>real two-step: TSEVNTENA, no TSENALL, Sync + Follow_Up sent by the CPU with the time taken from TDES0/1</td><td>a Sync/Follow_Up sequence that follows the 1588 standard</td></tr>
+</table>
+
+</main>
+</body>
+</html>

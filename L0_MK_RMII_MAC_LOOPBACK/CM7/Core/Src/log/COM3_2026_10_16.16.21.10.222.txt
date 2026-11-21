@@ -1,0 +1,757 @@
+
+ ============ filter_test.c: bai thuc hanh bo loc (main() se KHONG chay) ============
+[2] Descriptor 16 byte; ring TX 4 x, RX 8 x; buffer 1600 byte -> tx_buf 6400 B, rx_buf 12800 B
+[2] D-cache TAT (SCB->CCR = 0x00040200, bit DC = 0) -> CPU va DMA thay cung du lieu RAM
+
+================ [3] DWT, chan RMII (AF11), SYSCFG chon RMII, reset khoi ETH   (t = 24 ms) ================
+[3] DWT CYCCNT dang dem (CYCCNT = 127), clock GPIOA/B/C/G + SYSCFG ON
+[3] Chan PA1  -> AF11 (MODER=0xABFFFFFB AFR[0]=0x000000B0)
+[3] Chan PA2  -> AF11 (MODER=0xABFFFFEB AFR[0]=0x00000BB0 Chan PA7  -> ]
+[3)AF11 (MODER=0xABFFBFEB AFR[0]=0xB0000BB0)
+[3] Chan PC1  -> AF11 (MODER=0xF3FFFFFB AFR[0]=0x000000B0)
+[3] Chan PC4  -> AF11 (MODER=0xF3FFFEFB AFR[0]=0x000B00B0)
+[3] Chan PC5  -> AF11 (MODER=0xF3FFFAFB AFR[0]=0x000B0BB0)
+[3] Chan PB13 -> AF11 (MODER=0xFBFFFEBF AFR[1]=0x00B00000)
+[3] Chan PG11 -> AF11 (MODER=0xFFBFFFFF AFR[1]=0x0000B000)
+[3] Chan PG13 -> AF11 (MODER=0xFBBFFFFF AFR[1]=0x00B0B000)
+[3] SYSCFG_PMCR = 0x03800000 -> EPIS = 4 (4 = RMII)
+[3] RCC_AHB1ENR = 0x00038000 (ETH1MAC/TX/RX clock ON), da reset khoi ETH qua RCC
+[3] RCC_AHB1RSTR = 0x00000000 (ETH1MACRST = 0, phai = 0)
+[3] Tat ngat ETH (chuong trinh chay kieu polling)
+
+================ [4] Doc version, software reset DMA/MTL/MAC, tick 1 us   (t = 112 ms) ================
+MAC version: 00003142
+[4] Ghi ETH_DMAMR.SWR = 1 (software reset DMA/MTL/MAC), cho phan cung tu xoa...
+      ETH_DMAMR (truoc SWR)      @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+[4] SWR tu xoa sau ~3 us -> reset xong
+[4] SWR do bang DWT: 813478 chu ky = 3631.59 us
+      ETH_DMAMR (sau SWR)        @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+      ETH_MAC1USTCR (223)        @0x400280DC = 0x000000DF
+
+================ [5] Cau hinh DMA kenh 0 (TX control, RX control, channel, bus)   (t = 163 ms) ================
+[5] Cau hinh DMA kenh 0 (doc lai sau moi lan ghi):
+      ETH_DMACTXCR truoc khi ghi = 0x00000000
+      ETH_DMACTXCR (0x00080010)  @0x40029104 = 0x00080010
+        -> ST=0 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR truoc khi ghi = 0x00000000
+      ETH_DMACRXCR (0x00080C80)  @0x40029108 = 0x00080C80
+        -> SR=0 RBSZ=1600 RXPBL=8 RPF=0
+      ETH_DMACCR truoc khi ghi = 0x00000000
+      ETH_DMACCR (0x00010000)    @0x40029100 = 0x00010000
+        -> MSS=0 PBLX8=1 DSL=0
+      ETH_DMASBMR (0x00001001)   @0x40029004 = 0x00001001
+        -> FB=1 AAL=1 MB=0 RB=0
+      ETH_DMACIER (0)            @0x40029134 = 0x00000000
+
+================ [6] Khoi tao descriptor, dang ky ring voi DMA   (t = 230 ms) ================
+[6] tx_desc @0x24004e80  rx_desc @0x24004ec0  (16 byte/descriptor)
+[6] tx_buf  @0x24000100  rx_buf  @0x24001a00  (1600 byte/buffer)
+[6] rx_desc[0]: des0=0x24001A00 (= rx_buf[0])  des3=0x81000000 (OWN|BUF1V)
+        -> BUF1V=1 BUF2V=0 IOC=0 OWN=1
+[6] Dang ky ring voi DMA:
+      ETH_DMACTXDLAR (&tx_desc[0]) @0x40029114 = 0x24004E80
+      ETH_DMACTXRLR (3)          @0x4002912C = 0x00000003
+      ETH_DMACRXDLAR (&rx_desc[0]) @0x4002911C = 0x24004EC0
+      ETH_DMACRXRLR (7)          @0x40029130 = 0x00000007
+      ETH_DMACTXDTPR (TX tail)   @0x40029120 = 0x24004E80
+      ETH_DMACRXDTPR (RX tail)   @0x40029128 = 0x24004F30
+      ETH_DMADSR (TPS/RPS)       @0x4002900C = 0x00000000
+      ETH_DMACSR (status)        @0x40029160 = 0x00000000
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=0 Stopped
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004EC0 = rx_desc[0]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      --- Ring descriptor (sau khi khoi tao) ---        DES0     DES1     DES2     DES3
+      tx_desc[0] @0x24004E80:  00000000 00000000 00000000 00000000  [CPU giu] <- tx_head <- TX TAIL <- DMA dang o
+      tx_desc[1] @0x24004E90:  00000000 00000000 00000000 00000000  [CPU giu]
+      tx_desc[2] @0x24004EA0:  00000000 00000000 00000000 00000000  [CPU giu]
+      tx_desc[3] @0x24004EB0:  00000000 00000000 00000000 00000000  [CPU giu]
+      rx_desc[0] @0x24004EC0:  24001A00 00000000 00000000 81000000  [DMA giu] <- rx_head <- DMA dang o
+      rx_desc[1] @0x24004ED0:  24002040 00000000 00000000 81000000  [DMA giu]
+      rx_desc[2] @0x24004EE0:  24002680 00000000 00000000 81000000  [DMA giu]
+      rx_desc[3] @0x24004EF0:  24002CC0 00000000 00000000 81000000  [DMA giu]
+      rx_desc[4] @0x24004F00:  24003300 00000000 00000000 81000000  [DMA giu]
+      rx_desc[5] @0x24004F10:  24003940 00000000 00000000 81000000  [DMA giu]
+      rx_desc[6] @0x24004F20:  24003F80 00000000 00000000 81000000  [DMA giu]
+      rx_desc[7] @0x24004F30:  240045C0 00000000 00000000 81000000  [DMA giu] <- RX TAIL
+
+================ [7] Cau hinh MTL: hang doi TX/RX (FIFO giua DMA va MAC)   (t = 438 ms) ================
+[7] Cau hinh MTL (FIFO giua DMA va MAC):
+      ETH_MTLTXQOMR gia tri da ghi = 0x0007000A
+      ETH_MTLTXQOMR (0x0007000A) @0x40028D00 = 0x0007000A
+        -> FTQ=0 TSF=1 TXQEN=2 TTC=0 TQS=7
+      ETH_MTLRXQOMR (0x00700060) @0x40028D30 = 0x00700060
+        -> RTC=0 FUP=0 FEP=0 RSF=1 DIS_TCP_EF=1 RQS=7
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 dangoi g cho, RXQSTS=0 rong, RRCSTS=0 Idle
+
+================ [8] Cau hinh MAC (bo loc, dia chi, MACCR), roi khoi dong: DMA truoc, MAC sau   (t = 486 ms) ================
+[8] Cau hinh MAC:
+      ETH_MACPFR (PR = 1)        @0x40028008 = 0x00000000
+        -> PR=0 HUC=0 HMC=0 DAIF=0 PM=0 DBF=0 PCF=0 SAIF=0 SAF=0 HPF=0 RA=0
+      ETH_MACA0HR (MAC byte 5:4) @0x40028300 = 0x80000000
+      ETH_MACA0LR (MAC byte 3:0) @0x40028304 = 0x00E18000
+MAC Control: 307000
+      ETH_MACCR (0x00307000)     @0x40028000 = 0x0030F000
+        -> RE=0 TE=0 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=0 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] Bat DMA: ST = 1 (TX), SR = 1 (RX)
+      ETH_DMACTXCR (0x00080011)  @0x40029104 = 0x00080011
+        -> ST=1 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR (0x00080C81)  @0x40029108 = 0x00080C81
+        -> SR=1 RBSZ=1600 RXPBL=8 RPF=0
+      ETH_DMADSR (TPS/RPS)       @0x4002900C = 0x00000300
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004EC0 = rx_desc[0]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      ETH_MACCR (0x00307003)     @0x40028000 = 0x0030F003
+        -> RE=1 TE=1 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=0 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] MAC: CST=1 ACS=1 LM=1 (loopback) FES=1 (100M) DM=1 (full duplex) TE=1 RE=1
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+      MMC: TX good=0  TX 1-collision=0  TX nhieu-collision=0 | RX unicast good=0  RX loi CRC=0  RX loi align=0
+
+================ BAI THUC HANH BO LOC DIA CHI MAC (filter_test.c) ================
+Board: MACA0 = 00:80:E1:00:00:00. Moi dong: dat bo loc -> gui 1 frame qua MAC loopback -> xem co ve RX.
+hashDA      = ma hash phan mem tinh cho DA (RM tr.3121), bit 5 chon HT1R/HT0R.
+HF/MADRM    = RDES2 do PHAN CUNG ghi: HF=1 -> MADRM la ma hash phan cung tinh (phai = hashDA);
+              HF=0 -> MADRM la so thanh ghi MACAx da khop. DAF/SAF = 1: truot loc DA/SA.
+
+ID  DA gui             MACPFR     HT1R     HT0R     hashDA | du kien thuc te | HF MADRM DAF SAF | ket qua
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000100
+        [ 0.. 5] Dest MAC      : 6C 1F F7 CA 2B FD
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 01 00 00 00
+[10] Ghi TX tail = &tx_desc[1] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1775 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E90 = tx_desc[1] | RX 0x24004ED0 = rx_desc[1]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 827 ms) ================
+
+[11] rx_desc[0] OWN = 0 -> DMA da ghi xong: RDES3=0x3001003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24001A00 RDES1=0x00000000 RDES2=0x00000000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[0] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[0], rx_head tiep theo = 1
+A1  6C:1F:F7:CA:2B:FD  0x00000001 00000000 00000000 34     | QUA     QUA     |  -     -   -   - | OK   PR=1: DA la van qua
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000740
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 00
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 02 00 00 00
+[10] Ghi TX tail = &tx_desc[2] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1699 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1777 chu ky = 7.93 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EA0 = tx_desc[2] | RX 0x24004EE0 = rx_desc[2]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 1021 ms) ================
+
+[11] rx_desc[1] OWN = 0 -> DMA da ghi xong: RDES3=0x3001003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24002040 RDES1=0x00000000 RDES2=0x00000000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[1] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[1], rx_head tiep theo = 2
+B1  00:80:E1:00:00:00  0x00000000 00000000 00000000 13     | QUA     QUA     |  -     -   -   - | OK   perfect: DA = board (MACA0)
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000d80
+        [ 0.. 5] Dest MAC      : 6C 1F F7 CA 2B FD
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 03 00 00 00
+[10] Ghi TX tail = &tx_desc[3] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EB0 = tx_desc[3] | RX 0x24004EE0 = rx_desc[2]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+B2  6C:1F:F7:CA:2B:FD  0x00000000 00000000 00000000 34     | VUT     VUT     |  -     -   -   - | OK   perfect: DA la
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x240013c0
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 01
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 04 00 00 00
+[10] Ghi TX tail = &tx_desc[0] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004EE0 = rx_desc[2]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+B3  00:80:E1:00:00:01  0x00000000 00000000 00000000 23     | VUT     VUT     |  -     -   -   - | OK   perfect: sai dung byte cuoi
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000100
+        [ 0.. 5] Dest MAC      : 6C 1F F7 CA 2B FD
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 05 00 00 00
+[10] Ghi TX tail = &tx_desc[1] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1699 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1776 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E90 = tx_desc[1] | RX 0x24004EF0 = rx_desc[3]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 1545 ms) ================
+
+[11] rx_desc[2] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24002680 RDES1=0x00000000 RDES2=0x00080000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[2] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[2], rx_head tiep theo = 3
+B4  6C:1F:F7:CA:2B:FD  0x00000000 00000000 00000000 34     | QUA     QUA     |  0     1   0   0 | OK   perfect: them PEER vao MACA1
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000740
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 01
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 06 00 00 00
+[10] Ghi TX tail = &tx_desc[2] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1775 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EA0 = tx_desc[2] | RX 0x24004F00 = rx_desc[4]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 1739 ms) ================
+
+[11] rx_desc[3] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24002CC0 RDES1=0x00000000 RDES2=0x00080000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[3] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[3], rx_head tiep theo = 4
+B5  00:80:E1:00:00:01  0x00000000 00000000 00000000 23     | QUA     QUA     |  0     1   0   0 | OK   group: MACA1 = board, bo qua byte cuoi
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000d80
+        [ 0.. 5] Dest MAC      : FF FF FF FF FF FF
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 07 00 00 00
+[10] Ghi TX tail = &tx_desc[3] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1775 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EB0 = tx_desc[3] | RX 0x24004F10 = rx_desc[5]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RCSTS=0 Idle
+    R  MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 1935 ms) ================
+
+[11] rx_desc[4] OWN = 0 -> DMA da ghi xong: RDES3=0x3001003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24003300 RDES1=0x00000000 RDES2=0x00000000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[4] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[4], rx_head tiep theo = 5
+C1  FF:FF:FF:FF:FF:FF  0x00000000 00000000 00000000  0     | QUA     QUA     |  -     -   -   - | OK   broadcast, DBF=0
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x240013c0
+        [ 0.. 5] Dest MAC      : FF FF FF FF FF FF
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 08 00 00 00
+[10] Ghi TX tail = &tx_desc[0] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 T=0 ES=0 TTSS=0 J0 FF=0 PCE=LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004F10 = rx_desc[5]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+C2  FF:FF:FF:FF:FF:FF  0x00000020 00000000 00000000  0     | VUT     VUT     |  -     -   -   - | OK   broadcast, DBF=1
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000100
+        [ 0.. 5] Dest MAC      : 01 00 5E 00 00 FB
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 09 00 00 00
+[10] Ghi TX tail = &tx_desc[1] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E90 = tx_desc[1] | RX 0x24004F10 = rx_desc[5]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+D1  01:00:5E:00:00:FB  0x00000000 00000000 00000000 48     | VUT     VUT     |  -     -   -   - | OK   multicast perfect: khong co trong MACAx
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000740
+        [ 0.. 5] Dest MAC      : 01 00 5E 00 00 FB
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 0A 00 00 00
+[10] Ghi TX tail = &tx_desc[2] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1776 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EA0 = tx_desc[2] | RX 0x24004F20 = rx_desc[6]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 2460 ms) ================
+
+[11] rx_desc[5] OWN = 0 -> DMA da ghi xong: RDES3=0x3001003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24003940 RDES1=0x00000000 RDES2=0x00000000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[5] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[5], rx_head tiep theo = 6
+D2  01:00:5E:00:00:FB  0x00000010 00000000 00000000 48     | QUA     QUA     |  -     -   -   - | OK   PM=1: moi multicast deu qua
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=PC=0 LD=1 FD=1 CTXT=0 OWN=1
+0 C      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000d80
+        [ 0.. 5] Dest MAC      : 01 00 5E 00 00 FB
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 0B 00 00 00
+[10] Ghi TX tail = &tx_desc[3] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  2213 chu ky = 9.87 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EB0 = tx_desc[3] | RX 0x24004F30 = rx_desc[7]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 2654 ms) ================
+
+[11] rx_desc[6] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24003F80 RDES1=0x00000000 RDES2=0x01840000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[6] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[6], rx_head tiep theo = 7
+D3  01:00:5E:00:00:FB  0x00000004 00010001 00000000 48     | QUA     QUA     |  1    48   0   0 | OK  (ma hash khop)  hash {mDNS, all-hosts}: gui mDNS
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x240013c0
+        [ 0.. 5] Dest MAC      : 01 00 5E 00 00 01
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 0C 00 00 00
+[10] Ghi TX tail = &tx_desc[0] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1776 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004EC0 = rx_desc[0]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 2850 ms) ================
+
+[11] rx_desc[7] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x240045C0 RDES1=0x00000000 RDES2=0x01040000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[7] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[7], rx_head tiep theo = 0
+D4  01:00:5E:00:00:01  0x00000004 00010001 00000000 32     | QUA     QUA     |  1    32   0   0 | OK  (ma hash khop)  hash {mDNS, all-hosts}: gui all-hosts
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000100
+        [ 0.. 5] Dest MAC      : 01 00 5E 00 00 02
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 0D 00 00 00
+[10] Ghi TX tail = &tx_desc[1] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E90 = tx_desc[1] | RX 0x24004EC0 = rx_desc[0]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+D5  01:00:5E:00:00:02  0x00000004 00010001 00000000 55     | VUT     VUT     |  -     -   -   - | OK   hash {mDNS, all-hosts}: gui all-routers
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000740
+        [ 0.. 5] Dest MAC      : 01 00 5E 00 00 18
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 0E 00 00 00
+[10] Ghi TX tail = &tx_desc[2] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  2214 chu ky = 9.88 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EA0 = tx_desc[2] | RX 0x24004ED0 = rx_desc[1]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 3213 ms) ================
+
+[11] rx_desc[0] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24001A00 RDES1=0x00000000 RDES2=0x01040000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[0] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[0], rx_head tiep theo = 1
+D6  01:00:5E:00:00:18  0x00000004 00010001 00000000 32     | QUA     QUA     |  1    32   0   0 | OK  (ma hash khop)  hash: ..:00:18 LOT (trung ma all-hosts)
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000d80
+        [ 0.. 5] Dest MAC      : 01 00 5E 00 00 C9
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 0F 00 00 00
+[10] Ghi TX tail = &tx_desc[3] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1776 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EB0 = tx_desc[3] | RX 0x24004EE0 = rx_desc[2]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 3410 ms) ================
+
+[11] rx_desc[1] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24002040 RDES1=0x00000000 RDES2=0x01840000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[1] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[1], rx_head tiep theo = 2
+D7  01:00:5E:00:00:C9  0x00000004 00010001 00000000 48     | QUA     QUA     |  1    48   0   0 | OK  (ma hash khop)  hash: ..:00:C9 LOT (trung ma mDNS)
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x240013c0
+        [ 0.. 5] Dest MAC      : 33 33 00 00 00 01
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 10 00 00 00
+[10] Ghi TX tail = &tx_desc[0] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004EE0 = rx_desc[2]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+D8  33:33:00:00:00:01  0x00000004 00010001 00000000  1     | VUT     VUT     |  -     -   -   - | OK   hash: gui IPv6 33:33:00:00:00:01
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000100
+        [ 0.. 5] Dest MAC      : 6C 1F F7 CA 2B FD
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 11 00 00 00
+[10] Ghi TX tail = &tx_desc[1] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1776 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E90 = tx_desc[1] | RX 0x24004EF0 = rx_desc[3]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 3773 ms) ================
+
+[11] rx_desc[2] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24002680 RDES1=0x00000000 RDES2=0x01140000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[2] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[2], rx_head tiep theo = 3
+E1  6C:1F:F7:CA:2B:FD  0x00000002 00000004 00000000 34     | QUA     QUA     |  1    34   0   0 | OK  (ma hash khop)  HUC=1, hash {PEER}: gui PEER
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000740
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 00
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 12 00 00 00
+[10] Ghi TX tail = &tx_desc[2] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EA0 = tx_desc[2] | RX 0x24004EF0 = rx_desc[3]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+E2  00:80:E1:00:00:00  0x00000002 00000004 00000000 13     | VUT     VUT     |  -     -   -   - | OK   HUC=1, HPF=0: gui board (chi hash)
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000d80
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 00
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 13 00 00 00
+[10] Ghi TX tail = &tx_desc[3] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1776 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EB0 = tx_desc[3] | RX 0x24004F00 = rx_desc[4]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 4135 ms) ================
+
+[11] rx_desc[3] OWN = 0 -> DMA da ghi xong: RDES3=0x3001003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24002CC0 RDES1=0x00000000 RDES2=0x00000000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[3] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[3], rx_head tiep theo = 4
+E3  00:80:E1:00:00:00  0x00000402 00000004 00000000 13     | QUA     QUA     |  -     -   -   - | OK   HUC=1, HPF=1: gui board (hash HOAC perf)
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x240013c0
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 00
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 14 00 00 00
+[10] Ghi TX tail = &tx_desc[0] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004F00 = rx_desc[4]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+F1  00:80:E1:00:00:00  0x00000008 00000000 00000000 13     | VUT     VUT     |  -     -   -   - | OK   DAIF=1: DA = board -> bi vut
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000100
+        [ 0.. 5] Dest MAC      : 6C 1F F7 CA 2B FD
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 15 00 00 00
+[10] Ghi TX tail = &tx_desc[1] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000100 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1775 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E90 = tx_desc[1] | RX 0x24004F10 = rx_desc[5]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 4496 ms) ================
+
+[11] rx_desc[4] OWN = 0 -> DMA da ghi xong: RDES3=0x3001003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24003300 RDES1=0x00000000 RDES2=0x00000000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[4] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[4], rx_head tiep theo = 5
+F2  6C:1F:F7:CA:2B:FD  0x00000008 00000000 00000000 34     | QUA     QUA     |  -     -   -   - | OK   DAIF=1: DA la -> qua
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000740
+        [ 0.. 5] Dest MAC      : 6C 1F F7 CA 2B FD
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 16 00 00 00
+[10] Ghi TX tail = &tx_desc[2] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000740 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  2213 chu ky = 9.87 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EA0 = tx_desc[2] | RX 0x24004F20 = rx_desc[6]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 4690 ms) ================
+
+[11] rx_desc[5] OWN = 0 -> DMA da ghi xong: RDES3=0x3801003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24003940 RDES1=0x00000000 RDES2=0x00020000 (write-back, khong con la dia chi buffer)
+[11] Tra rdesx_c[5] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[5], rx_head tiep theo = 6
+G1  6C:1F:F7:CA:2B:FD  0x80000000 00000000 00000000 34     | QUA     QUA     |  0     0   1   0 | OK   RA=1: DA lan quaa v, DAF=1
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x24000d80
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 00
+        [ 6..11] Src MAC       : 00 80 E1 00 00 00
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 17 00 00 00
+[10] Ghi TX tail = &tx_desc[3] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24000D80 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  1775 chu ky = 7.92 us
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004EB0 = tx_desc[3] | RX 0x24004F30 = rx_desc[7]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Nhan 1 frame (RX)   (t = 4884 ms) ================
+
+[11] rx_desc[6] OWN = 0 -> DMA da ghi xong: RDES3=0x3001003C (CTXT=0 FD=1 LD=1 ES=0 PL=60)
+        -> PL=60 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24003F80 RDES1=0x00000000 RDES2=0x00000000 (write-back, khong con la dia chi buffer)
+[11] Tra rx_desc[6] lai cho DMA (RDES3=0x81000000), RX tail = &rx_desc[6], rx_head tiep theo = 7
+H1  00:80:E1:00:00:00  0x00000200 00000000 00000000 13     | QUA     QUA     |  -     -   -   - | OK   SAF=1, MACA1(SA)=board: SA = board
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 TDES3=0xB0000016 (OWN=1 -> giao cho DMA)
+        -> FL=22 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (DMA se doc tu day): 22 byte @0x240013c0
+        [ 0.. 5] Dest MAC      : 00 80 E1 00 00 00
+        [ 6..11] Src MAC       : 02 00 00 00 00 99
+        [12..13] EtherType     : 88 B5
+        [14..21] Payload       : 46 49 4C 54 18 00 00 00
+[10] Ghi TX tail = &tx_desc[0] de danh thuc DMA, roi poll OWN...
+[10] Poll xong sau 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x240013C0 TDES1=0x00000000 TDES2=0x00000016 (sau write-back; TDES0/1 = timestamp neu TTSS=1)
+[10] Thoi gian tu luc ghi tail den khi DMA tra OWN (TX xong): 1698 chu ky = 7.58 us
+[10] Thoi gian tu luc ghi tail den khi frame loopback ve RX:  chua thay sau 2 ms (RX chua ve)
+     (64 byte frame + 8 byte preamble/SFD o 100 Mbit/s mat ~5.76 us tren duong truyen)
+      DMA TX: TPS0=6 SUSPENDED: het descriptor hoac underflow | DMA RX: RPS0=3 Running: cho frame
+      DMA dang o: TX 0x24004E80 = tx_desc[0] | RX 0x24004F30 = rx_desc[7]
+      ETH_DMACSR (co trang thai) @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: TXQSTS=0 (rong), TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 goi dang cho, RXQSTS=0 rong, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+H2  00:80:E1:00:00:00  0x00000200 00000000 00000000 13     | VUT     VUT     |  -     -   -   - | OK   SAF=1, MACA1(SA)=board: SA la
+
+Ket qua: 24/24 dong dung du kien.
+Nhan nut USER de chay lai.

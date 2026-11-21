@@ -1,0 +1,893 @@
+
+============ L0_MK_RMII_MAC_LOOPBACK ============
+Press USER to run the test again
+
+================ [1] Board: HAL, clock, UART, USER button   (t = 8 ms) ================
+[1] HAL + SystemockCl_Config done: SystemCoreClock = 2240000, HCLK 00 Hz= 224000000 Hz
+[1] UART COM1 115200-8N1, USER button = EXTI interrupt
+      Chip: DBGMCU_IDCODE=0x20036450 -> DEV_ID=0x450 (0x450 = STM32H74x/75x), REV_ID=0x2003
+      Core: SCB->CPUID=0x411FC271 -> Cortex-M7 r1p1
+      Clock: SYSCLK=224000000 HCLK=224000000 PCLK1=56000000 PCLK2=112000000 Hz
+      Cache: I-cache=0 D-cache=0 (SCB->CCR bit 17/16)
+RMII[0] MAC Loopback Test
+[L1] ======== RMII[0] - START TEST ========
+
+
+================ [2] DMA memory check: D-cache must be OFF   (t = 61 ms) ================
+[2] Descriptor 16 bytes; ring TX 4, RX 8; buffer 2304 bytes -> tx_buf 9216 B, rx_buf 18432 B
+[2] D-cache OFF (SCB->CCR = 0x00040200, bit DC = 0) -> CPU and DMA see the same RAM
+
+================ [3] DWT, RMII pins (AF11), SYSCFG = RMII, ETH clocks and reset   (t = 86 ms) ================
+[3] DWT CYCCNT counting (CYCCNT = 23)
+[3] Clock GPIOA/B/C/G + SYSCFG ON
+[3] Pin PA1  REF_CLK -> AF11 (MODER=0xABFFFFFB AFR[0]=0x000000B0)
+[3] Pin PA2  MDIO    -> AF11 (MODER=0xABFFFFEB AFR[0]=0x00000BB0)
+[3] Pin PA7  CRS_DV  -> AF11 (MODER=0xABFFBFEB AFR[0]=0xB0000BB0)
+[3] Pin PC1  MDC     -> AF11 (MODER=0xF3FFFFFB AFR[0]=0x000000B0)
+[3] Pin PC4  RXD0    -> AF11 (MODER=0xF3FFFEFB AFR[0]=0x000B00B0)
+[3] Pin PC5  RXD1    -> AF11 (MODER=0xF3FFFAFB AFR[0]=0x00BB00B0)
+[3] Pin PB13 TXD1    -> AF11 (MODER=0xFBFFFEBF AFR[1]=0x00B00000)
+[3] Pin PG11 TX_EN   -> AF11 (MODER=0xFFBFFFFF AFR[1]=0xB000)
+[3] Pin PG13 TXD0  0000  -> AF11 (MODER=0xFBBFFFFF AFR[1]=0x00B0B000)
+[3] SYSCFG_PMCR = 0x03800000 -> EPIS = 4 (4 = RMII)
+[3] RCC_AHB1ENR = 0x00038000 (ETH1MAC/TX/RX clocks ON), ETH block reset by RCC
+[3] RCC_AHB1RSTR = 0x00000000 (ETH1MACRST = 0, must be 0)
+[3] ETH interrupt OFF (the test polls the descriptors)
+Start Init: Port[0]
+
+================ [4] Read version, software reset DMA/MTL/MAC, 1 us tick   (t = 183 ms) ================
+MAC version: 0x00003142
+[4] Write ETH_DMAMR.SWR = 1 (software reset DMA/MTL/MAC), wait for the hardware to clear it...
+      ETH_DMAMR (before SWR)       @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+MAC Reset done.
+[4] SWR cleared after ~3 us -> reset done
+      ETH_DMAMR (after SWR)        @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+      ETH_MAC1USTCR                @0x400280DC = 0x000000DF
+
+================ [5] DMA channel 0: TX control, RX control, channel control, bus mode   (t = 234 ms) ================
+[5] DMA channel 0 (read back after the writes):
+      ETH_DMACTXCR                 @0x40029104 = 0x00080010
+        -> ST=0 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081200
+        -> SR=0 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMACCR                   @0x40029100 = 0x00010000
+        -> MSS=0 PBLX8=1 DSL=0
+      ETH_DMASBMR                  @0x40029004 = 0x00001001
+        -> FB=1 AAL=1 MB=0 RB=0
+      ETH_DMACIER                  @0x40029134 = 0x00000000
+
+================ [6] Descriptors, register the rings with the DMA   (t = 290 ms) ================
+[6] tx_desc @0x2400CB80  rx_desc @0x2400CBC0  (16 bytes/descriptor, TX 4, RX 8)
+[6] tx_buf  @0x24002640  rx_buf  @0x24004A40  (2304 bytes/buffer)
+[6] rx_desc[0]: des0=0x24004A40 (= rx_buf[0])  des3=0x81000000 (OWN|BUF1V)
+        -> BUF1V=1 BUF2V=0 IOC=0 OWN=1
+[6] Ring registers:
+      ETH_DMACTXDLAR (&tx_desc[0]) @0x40029114 = 0x2400CB80
+      ETH_DMACTXRLR (count - 1)    @0x4002912C = 0x00000003
+      ETH_DMACRXDLAR (&rx_desc[0]) @0x4002911C = 0x2400CBC0
+      ETH_DMACRXRLR (count - 1)    @0x40029130 = 0x00000007
+      ETH_DMACTXDTPR (TX tail)     @0x40029120 = 0x2400CB80
+      ETH_DMACRXDTPR (RX tail)     @0x40029128 = 0x2400CC30
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=0 Stopped
+      DMA �
+============ L0_MK_RMII_MAC_LOOPBACK ============
+Press USER to run the test again
+
+================ [1] Board: HAL, clock, UART, USER button   (t = 8 ms) ================
+[1] HAL + SystemClock_Config done: SystemCoreClock = 224000000 Hz, HCLK = 224000000 Hz
+[1] UART COM1 115200-8N1, USER button = EXTI interrupt
+      Chip: DBGMCU_IDCODE=0x20036450 -> DEV_ID=0x450 (0x450 = STM32H74x/75x), REV_ID=0x2003
+      Core: SCB->CPUID=0x411FC271 -> Cortex-M7 r1p1
+      Clock: SYSCLK=224000000 HCLK=224000000 PCLK1=56000000 PCLK2=112000000 Hz
+      Cache: I-cache=0 D-cache=0 (SCB->CCR bit 17/16)
+RMII[0] MAC Loopback Test
+[L1] ======== RMII[0] - START TEST ========
+
+
+================ [2] DMA memory check: achD-ce must be OFF   (t = 61 ms) ================
+[2] Descriptor 16 bytes; ring TX 4, RX 8; buffer 2304 bytes -> tx_buf 9216 B, rx_buf 18432 B
+[2] D-cache OFF (SCB->CCR = 0x00040200, bit DC = 0) -> CPU and DMA see the same RAM
+
+================ [3] DWT, RMII pins (AF11), SYSCFG = RMII, ETH clocks and reset   (t = 86 ms) ================
+[3] DWT CYCCNT counting (CYCCNT = 23)
+[3] Clock GPIOA/B/C/G + SYSCFG ON
+[3] Pin PA1  REF_CLK -> AF11 (MODER=0xABFFFFFB AFR[0]=0x000000B0)
+[3] Pin PA2  MDIO    -> AF11 (MODER=0xABFFFFEB AFR[0]=0x00000BB0)
+[3] Pin PA7  CRS_DV  -> AF11 (MODER=0xABFFBFEB AFR[0]=0xB0000BB0)
+[3] Pin PC1  MDC     -> AF11 (MODER=0xF3FFFFFB AFR[0]=0x000000B0)
+[3] Pin PC4  RXD0    -> AF11 (MODER=0xF3FFFEFB AFR[0]=0x000B00B0)
+[3] Pin PC5  RXD1    -> AF11 (MODER=0xF3FFFAFB AFR[0]=0x00BB00B0)
+[3] Pin PB13 TXD1    -> AF11 (MODER=0xFBFFFEBF AFR[1]=0x00B00000)
+[3] Pin PG11 TX_EN   -> AF11 (MODER=0xFFBFFFFF AFR[1]=0x0000B000)
+[3] Pin PG13 TXD0    -> AF11 (MODER=0xFBBFFFFF AFR[1]=0x00B0B000)
+[3] SYSCFG_PMCR = 0x03800000 -> EPIS = 4 (4 = RMII)
+[3] RCC_AHB1ENR = 0x00038000 (ETH1MAC/TX/RX clocks ON), ETH block reset by RCC
+[3] RCC_AHB1RSTR = 0x00000000 (ETH1MACRST = 0, must be 0)
+[3] ETH interrupt OFF (the test polls the descriptors)
+Start Init: Port[0]
+
+================ [4] Read version, software reset DMA/MTL/MAC, 1 us tick   (t = 183 ms) ================
+MAC version: 0x00003142
+[4] Write ETH_DMAMR.SWR = 1 (software reset DMA/MTL/MAC), wait for the hardware to clear it...
+      ETH_DMAMR (before SWR)       @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+MAC Reset done.
+[4] SWR cleared after ~3 us -> reset done
+      ETH_DMAMR (after SWR)        @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+      ETH_MAC1USTCR                @0x400280DC = 0x000000DF
+
+================ [5] DMA channel 0: TX control, RX control, channel control, bus mode   (t = 234 ms) ================
+[5] DMA channel 0 (read back after the writes):
+      ETH_DMACTXCR                 @0x40029104 = 0x00080010
+        -> ST=0 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081200
+        -> SR=0 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMACCR                   @0x40029100 = 0x00010000
+        -> MSS=0 PBLX8=1 DSL=0
+      ETH_DMASBMR                  @0x40029004 = 0x00001001
+        -> FB=1 AAL=1 MB=0 RB=0
+      ETH_DMACIER                  @0x40029134 = 0x00000000
+
+================ [6] Descriptors, register the rings with the DMA   (t = 290 ms) ================
+[6] tx_desc @0x2400CB80  rx_desc @0x2400CBC0  (16 bytes/descriptor, TX 4, RX 8)
+[6] tx_buf  @0x24002640  rx_buf  @0x24004A40  (2304 bytes/buffer)
+[6] rx_desc[0]: des0=0x24004A40 (= rx_buf[0])  des3=0x81000000 (OWN|BUF1V)
+        -> BUF1V=1 BUF2V=0 IOC=0 OWN=1
+[6] Ring registers:
+      ETH_DMACTXDLAR (&tx_desc[0]) @0x40029114 = 0x2400CB80
+      ETH_DMACTXRLR (count - 1)    @0x4002912C = 0x00000003
+      ETH_DMACRXDLAR (&rx_desc[0]) @0x4002911C = 0x2400CBC0
+      ETH_DMACRXRLR (count - 1)    @0x40029130 = 0x00000007
+      ETH_DMACTXDTPR (TX tail)     @0x40029120 = 0x2400CB80
+      ETH_DMACRXDTPR (RX tail)     @0x40029128 = 0x2400CC30
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=0 Stopped
+      DMA is at: TX 0x2400CB80 = tx_desc[0] | RX 0x2400CBC0 = rx_desc[0]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      --- Descriptor rings (after init) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400CB80:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[1] @0x2400CB90:  00000000 00000000 00000000 00000000  [CPU]
+      tx_desc[2] @0x2400CBA0:  00000000 00000000 00000000 00000000  [CPU]
+      tx_desc[3] @0x2400CBB0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x2400CBC0:  24004A40 00000000 00000000 81000000  [DMA] <- rx_head <- DMA
+      rx_desc[1] @0x2400CBD0:  24005340 00000000 00000000 81000000  [DMA]
+      rx_desc[2] @0x2400CBE0:  24005C40 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x2400CBF0:  24006540 00000000 00000000 81000000  [DMA]
+      rx_desc[4] @0x2400CC00:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400CC10:  24007740 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x2400CC20:  24008040 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x2400CC30:  24008940 00000000 00000000 81000000  [DMA] <- RX tail
+
+================ [7] MTL: TX/RX queue 0 (FIFO between DMA and MAC)   (t = 484 ms) ================
+[7] MTL queue 0:
+      ETH_MTLTXQOMR                @0x40028D00 = 0x00070008
+        -> FTQ=0 TSF=0 TXQEN=2 TTC=0 TQS=7
+      ETH_MTLRXQOMR                @0x40028D30 = 0x00700040
+        -> RTC=0 FUP=0 FEP=0 RSF=0 DIS_TCP_EF=1 RQS=7
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+
+================ [8] MAC: filter, address, watchdog, MACCR; loopback; start (DMA first, MAC last)   (t = 525 ms) ================
+[8] MAC:
+      ETH_MACPFR                   @0x40028008 = 0x00000001
+        -> PR=1 HUC=0 HMC=0 DAIF=0 PM=0 DBF=0 PCF=0 SAIF=0 SAF=0 HPF=0 RA=0
+      ETH_MACA0HR (byte 5:4)       @0x40028300 = 0x80000000   (written 0x00000000)
+      ETH_MACA0LR (byte 3:0)       @0x40028304 = 0x00E18000
+      ETH_MACWTR                   @0x4002800C = 0x00000100
+        -> WTO=0 PWE=1
+      ETH_MACCR (TE/RE off)        @0x40028000 = 0x0031E000   (written 0x00316000)
+        -> RE=0 TE=0 PRELEN=0 DO=0 ECRSFD=0 LM=0 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] VLAN:
+      ETH_MACVIR                   @0x40028060 = 0x00100000
+      ETH_MACIVIR                  @0x40028064 = 0x00000000
+      ETH_MACVTR                   @0x40028050 = 0x85040000
+Init MAC Internal Loopback
+[8] MAC loopback: ETH_MACCR.LM = 1 (bit 12), TX goes back to RX inside the MAC
+      ETH_MACCR                    @0x40028000 = 0x0031F000
+        -> RE=0 TE=0 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] Start DMA: ST = 1 (TX), SR = 1 (RX)
+      ETH_DMACTXCR                 @0x40029104 = 0x00080011
+        -> ST=1 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081201
+        -> SR=1 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMADSR (TPS/RPS)         @0x4002900C = 0x00000300
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400CB80 = tx_desc[0] | RX 0x2400CBC0 = rx_desc[0]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+[8] Start MAC: TE = 1, RE = 1
+      ETH_MACCR                    @0x40028000 = 0x0031F003
+        -> RE=1 TE=1 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] MAC: CST=1 ACS=1 LM=1 (loopback) FES=1 (100M) DM=1 (full duplex) TE=1 RE=1
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+      MMC: TX good=0  TX 1-collision=0  TX multi-collision=0 | RX unicast good=0  RX CRC err=0  RX align err=0
+
+================ VLAN INSERTION TEST (TX context descriptor, TDES2.VTIR, ETH_MACVIR) ================
+  frame sent: 60 bytes, EtherType 0x88B5 at bytes 12..13. With a tag the MAC puts type + tag there and
+  shifts the rest by 4 bytes per tag. RDES3.LT: 1 = type, 4 = one VLAN tag, 5 = two VLAN tags
+  RDES0 = outer tag [15:0] (inner tag [31:16] only with stripping); ctx TDES3: bit 31 OWN and bit 23 CDE must be 0
+  id  len  bytes 12..21                     LT  RDES0       ctx TDES3   | result
+  case B prints the [10]/[11] FLOW lines (context descriptor + frame)
+[10] tx_desc[0] = context descriptor: TDES3=0xC0010064 (OWN CTXT VLTV, VT=0x0064), no tail write yet
+
+================ [10] Send 1 frame (TX)   (t = 797 ms) ================
+[10] Use tx_desc[1] @0x2400CB90, frame 60 bytes
+[10] TDES0=0x24002F40 TDES1=0x00000000 TDES2=0x0000803C TDES3=0xB000003C (OWN=1 -> given to the DMA)
+        -> FL=60 CIC=0 CPC=0 LD=1 FD=1 CTXT=0 OWN=1
+      [10] tx_buf (the DMA reads from here): 60 bytes @0x24002F40
+        [   0..   5] Dest MAC : 6C 1F F7 CA 2B FD
+        [   6..  11] Src MAC  : 00 80 E1 00 00 00
+        [  12..  13] EtherType: 88 B5
+        [  14..  59] Payload  : 1E 1F 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D
+                                2E 2F 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D
+                                3E 3F 40 41 42 43 44 45 46 47 48 49 4A 4B
+[10] Write TX tail = &tx_desc[2] to wake up the DMA, then poll OWN...
+[10] Poll done after 4 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+[10] TDES0=0x24002F40 TDES1=0x00000000 TDES2=0x0000803C (after write-back; TDES0/1 = timestamp if TTSS=1)
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400CBA0 = tx_desc[2] | RX 0x2400CBD0 = rx_desc[1]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Receive 1 frame (RX)   (t = 943 ms) ================
+[11] rx_desc[0] OWN = 0 -> the DMA is done: RDES3=0x3A040040 (CTXT=0 FD=1 LD=1 ES=0 PL=64)
+        -> PL=64 ES=0 LT=4 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=1 RS1V=0 RS2V=1 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x00000064 RDES1=0x00000000 RDES2=0x00008000 (write-back format)
+[11] Give rx_desc[0] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[0], next rx_head = 1
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400CBA0 = tx_desc[2] | RX 0x2400CBD0 = rx_desc[1]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=1  TX 1-collision=0  TX multi-collision=0 | RX unicast good=1  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400CB80:  00000000 00000000 00000000 40000000  [CPU]
+      tx_desc[1] @0x2400CB90:  24002F40 00000000 0000803C 30000000  [CPU]
+      tx_desc[2] @0x2400CBA0:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[3] @0x2400CBB0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x2400CBC0:  24004A40 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[1] @0x2400CBD0:  24005340 00000000 00000000 81000000  [DMA] <- rx_head <- DMA
+      rx_desc[2] @0x2400CBE0:  24005C40 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x2400CBF0:  24006540 00000000 00000000 81000000  [DMA]
+      rx_desc[4] @0x2400CC00:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400CC10:  24007740 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x2400CC20:  24008040 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x2400CC30:  24008940 00000000 00000000 81000000  [DMA]
+  B   64  81 00 00 64 88 B5 1E 1F 20 21  4   0x00000064  0x40000000  | OK   context tag A, VTIR = insert: MAC inserts tag A
+  C   64  81 00 00 64 88 B5 1E 1F 20 21  4   0x00000064      -       | OK   no new context, VTIR = insert: tag A still used
+  D   60  88 B5 1E 1F 20 21 22 23 24 25  1   0x24005C40      -       | OK   no new context, VTIR = none: no tag
+  E   64  81 00 E0 C8 88 B5 1E 1F 20 21  4   0x0000E0C8  0x40000000  | OK   context tag B, VTIR = insert: MAC inserts tag B
+
+Result: 4/5 cases as expected.
+Stats for MAC-idx: 0
+RX_MAC(unicast good/crc err/align err): 4 0 0
+TX_MAC(good/single col/multi col): 4 0 0
+[L1] ======== RMII[0] - END TEST ========
+
+[L1] ======== FAIL ========
+
+
+============ L0_MK_RMII_MAC_LOOPBACK ============
+Press USER to run the test again
+
+================ [1] Board: HAL, clock, UART, USER button   (t = 8 ms) ================
+[1] HAL + SystemClock_Config done: SystemCoreClock = 224000000 Hz, HCLK = 224000000 Hz
+[1] UART COM1 115200-8N1, USER button = EXTI interrupt
+      Chip: DBGMCU_IDCODE=0x20036450 -> DEV_ID=0x450 (0x450 = STM32H74x/75x), REV_ID=0x2003
+      Core: SCB->CPUID=0x411FC271 -> Cortex-M7 r1p1
+      Clock: SYSCLK=224000000 HCLK=224000000 PCLK1=56000000 PCLK2=112000000 Hz
+      Cache: I-cache=0 D-cache=0 (SCB->CCR bit 17/16)
+RMII[0] MAC Loopback Test
+[L1] ======== RMII[0] - START TEST ========
+
+
+================ [2] DMA memory check: D-cache must be OFF   (t = 61 ms) ================
+[2] Descriptor 16 bytes; ring TX 4, RX 8; buffer 2304 bytes -> tx_buf 9216 B, rx_buf 18432 B
+[2] D-cache OFF (SCB->CCR = 0x00040200, bit DC = 0) -> CPU and DMA see the same RAM
+
+================ [3] DWT, RMII pins (AF11), SYSCFG = RMII, ETH clocks and reset   (t = 86 ms) ================
+[3] DWT CYCCNT counting (CYCCNT = 23)
+[3] Clock GPIOA/B/C/G + SYSCFG ON
+[3] Pin PA1  REF_CLK -> AF11 (MODER=0xABFFFFFB AFR[0]=0x000000B0)
+[3] Pin PA2  MDIO    -> AF11 (MODER=0xABFFFFEB AFR[0]=0x00000BB0)
+[3] Pin PA7  CRS_DV  -> AF11 (MODER=0xABFFBFEB AFR[0]=0xB0000BB0)
+[3] Pin PC1  MDC     -> AF11 (MODER=0xF3FFFFFB AFR[0]=0x000000B0)
+[3] Pin PC4  RXD0    -> AF11 (MODER=0xF3FFFEFB AFR[0]=0x000B00B0)
+[3] Pin PC5  RXD1    -> AF11 (MODER=0xF3FFFAFB AFR[0]=0x00BB00B0)
+[3] Pin PB13 TXD1    -> AF11 (MODER=0xFBFFFEBF AFR[1]=0x00B00000)
+[3] Pin PG11 TX_EN   -> AF11 (MODER=0xFFBFFFFF AFR[1]=0x0000B000)
+[3] Pin PG13 TXD0    -> AF11 (MODER=0xFBBFFFFF AFR[1]=0x00B0B000)
+[3] SYSCFG_PMCR = 0x03800000 -> EPIS = 4 (4 = RMII)
+[3] RCC_AHB1ENR = 0x00038000 (ETH1MAC/TX/RX clocks ON), ETH block reset by RCC
+[3] RCC_AHB1RSTR = 0x00000000 (ETH1MACRST = 0, must be 0)
+[3] ETH interrupt OFF (the test polls the descriptors)
+Start Init: Port[0]
+
+================ [4] Read version, software reset DMA/MTL/MAC, 1 us tick   (t = 183 ms) ================
+MAC version: 0x00003142
+[4] Write ETH_DMAMR.SWR = 1 (software reset DMA/MTL/MAC), wait for the hardware to clear it...
+      ETH_DMAMR (before SWR)       @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+MAC Reset done.
+[4] SWR cleared after ~3 us -> reset done
+      ETH_DMAMR (after SWR)        @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+      ETH_MAC1USTCR                @0x400280DC = 0x000000DF
+
+================ [5] DMA channel 0: TX control, RX control, channel control, bus mode   (t = 234 ms) ================
+[5] DMA channel 0 (read back after the writes):
+      ETH_DMACTXCR                 @0x40029104 = 0x00080010
+        -> ST=0 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081200
+        -> SR=0 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMACCR                   @0x40029100 = 0x00010000
+        -> MSS=0 PBLX8=1 DSL=0
+      ETH_DMASBMR                  @0x40029004 = 0x00001001
+        -> FB=1 AAL=1 MB=0 RB=0
+      ETH_DMACIER                  @0x40029134 = 0x00000000
+
+================ [6] Descriptors, register the rings with the DMA   (t = 290 ms) ================
+[6] tx_desc @0x2400CB80  rx_desc @0x2400CBC0  (16 bytes/descriptor, TX 4�
+============ L0_MK_RMII_MAC_LOOPBACK ============
+Press USER to run the test again
+
+================ [1] Board: HAL, clock, UART, USER button   (t = 8 ms) ================
+[1] HAL + SystemClock_Config done: SystemCoreClock = 224000000 Hz, HCLK = 224000000 Hz
+[1] UART COM1 115200-8N1, USER button = EXTI interrupt
+      Chip: DBGMCU_IDCODE=0x20036450 -> DEV_ID=0x450 (0x450 = STM32H74x/75x), REV_ID=0x2003
+      Core: SCB->CPUID=0x411FC271 -> Cortex-M7 r1p1
+      Clock: SYSCLK=224000000 HCLK=224000000 PCLK1=56000000 PCLK2=112000000 Hz
+      Cache: I-cache=0 D-cache=0 (SCB->CCR bit 17/16)
+RMII[0] MAC Loopback Test
+[L1] ======== RMII[0] - START TEST ========
+
+
+================ [2] DMA memory check: D-cache must be OFF   (t = 61 ms) ================
+[2] Descriptor 16 bytes; ring TX 4, RX 8; buffer 2304 bytes -> tx_buf 9216 B, rx_buf 18432 B
+[2] D-cache OFF (SCB->CCR = 0x00040200, bit DC = 0) -> CPU and DMA see the same RAM
+
+================ [3] DWT, RMII pins (AF11), SYSCFG = RMII, ETH clocks and reset   (t = 86 ms) ================
+[3] DWT CYCCNT counting (CYCCNT = 19)
+[3] Clock GPIOA/B/C/G + SYSCFG ON
+[3] Pin PA1  REF_CLK -> AF11 (MODER=0xABFFFFFB AFR[0]=0x000000B0)
+[3] Pin PA2  MDIO    -> AF11 (MODER=0xABFFFFEB AFR[0]=0x00000BB0)
+[3] Pin PA7  CRS_DV  -> AF11 (MODER=0xABFFBFEB AFR[0]=0xB0000BB0)
+[3] Pin PC1  MDC     -> AF11 (MODER=0xF3FFFFFB AFR[0]=0x000000B0)
+[3] Pin PC4  RXD0    -> AF11 (MODER=0xF3FFFEFB AFR[0]=0x000B00B0)
+[3] Pin PC5  RXD1    -> AF11 (MODER=0xF3FFFAFB AFR[0]=0x00BB00B0)
+[3] Pin PB13 TXD1    -> AF11 (MODER=0xFBFFFEBF AFR[1]=0x00B00000)
+[3] Pin PG11 TX_EN   -> AF11 (MODER=0xFFBFFFFF AFR[1]=0x0000B000)
+[3] Pin PG13 TXD0    -> AF11 (MODER=0xFBBFFFFF AFR[1]=0x00B0B000)
+[3] SYSCFG_PMCR = 0x03800000 -> EPIS = 4 (4 = RMII)
+[3] RCC_AHB1ENR = 0x00038000 (ETH1MAC/TX/RX clocks ON), ETH block reset by RCC
+[3] RCC_AHB1RSTR = 0x00000000 (ETH1MACRST = 0, must be 0)
+[3] ETH interrupt OFF (the test polls the descriptors)
+Start Init: Port[0]
+
+================ [4] Read version, software reset DMA/MTL/MAC, 1 us tick   (t = 183 ms) ================
+MAC version: 0x00003142
+[4] Write ETH_DMAMR.SWR = 1 (software reset DMA/MTL/MAC), wait for the hardware to clear it...
+      ETH_DMAMR (before SWR)       @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+MAC Reset done.
+[4] SWR cleared after ~3 us -> reset done
+      ETH_DMAMR (after SWR)        @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+      ETH_MAC1USTCR                @0x400280DC = 0x000000DF
+
+================ [5] DMA channel 0: TX control, RX control, channel control, bus mode   (t = 234 ms) ================
+[5] DMA channel 0 (read back after the writes):
+      ETH_DMACTXCR                 @0x40029104 = 0x00080010
+        -> ST=0 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081200
+        -> SR=0 RBSZ=2304 RXPBL=8 RPF=0
+      DMACCRETH_                   @0x40029100 = 0x00010000
+        -> MSS=0 PBLX8=1 DSL=0
+      ETH_DMASBMR                  @0x40029004 = 0x00001001
+        -> FB=1 AAL=1 MB=0 RB=0
+      ETH_DMACIER                  @0x40029134 = 0x00000000
+
+================ [6] Descriptors, register the rings with the DMA   (t = 291 ms) ================
+[6] tx_desc @0x2400E080  rx_desc @0x2400E0C0  (16 bytes/descriptor, TX 4, RX 8)
+[6] tx_buf  @0x24002640  rx_buf  @0x24004A40  (2304 bytes/buffer)
+[6] rx_desc[0]: des0=0x24004A40 (= rx_buf[0])  des3=0x81000000 (OWN|BUF1V)
+        -> BUF1V=1 BUF2V=0 IOC=0 OWN=1
+[6] Ring registers:
+      ETH_DMACTXDLAR (&tx_desc[0]) @0x40029114 = 0x2400E080
+      ETH_DMACTXRLR (count - 1)    @0x4002912C = 0x00000003
+      ETH_DMACRXDLAR (&rx_desc[0]) @0x4002911C = 0x2400E0C0
+      ETH_DMACRXRLR (count - 1)    @0x40029130 = 0x00000007
+      ETH_DMACTXDTPR (TX tail)     @0x40029120 = 0x2400E080
+      ETH_DMACRXDTPR (RX tail)     @0x40029128 = 0x2400E130
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=0 Stopped
+      DMA is at: TX 0x2400E080 = tx_desc[0] | RX 0x2400E0C0 = rx_desc[0]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      --- Descriptor rings (after init) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[1] @0x2400E090:  00000000 00000000 00000000 00000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 00000000 00000000  [CPU]
+      tx_desc[3] @0x2400E0B0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA] <- rx_head <- DMA
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 81000000  [DMA]
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA]
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA] <- RX tail
+
+================ [7] MTL: TX/RX queue 0 (FIFO between DMA and MAC)   (t = 485 ms) ================
+[7] MTL queue 0:
+      ETH_MTLTXQOMR                @0x40028D00 = 0x00070008
+        -> FTQ=0 TSF=0 TXQEN=2 TTC=0 TQS=7
+      ETH_MTLRXQOMR                @0x40028D30 = 0x00700040
+        -> RTC=0 FUP=0 FEP=0 RSF=0 DIS_TCP_EF=1 RQS=7
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+
+================ [8] MAC: filter, address, watchdog, MACCR; loopback; start (DMA first, MAC last)   (t = 526 ms) ================
+[8] MAC:
+      ETH_MACPFR                   @0x40028008 = 0x00000001
+        -> PR=1 HUC=0 HMC=0 DAIF=0 PM=0 DBF=0 PCF=0 SAIF=0 SAF=0 HPF=0 RA=0
+      ETH_MACA0HR (byte 5:4)       @0x40028300 = 0x80000000   (written 0x00000000)
+      ETH_MACA0LR (byte 3:0)       @0x40028304 = 0x00E18000
+      ETH_MACWTR                   @0x4002800C = 0x00000100
+        -> WTO=0 PWE=1
+      ETH_MACCR (TE/RE off)        @0x40028000 = 0x0031E000   (written 0x00316000)
+        -> RE=0 TE=0 PRELEN=0 DO=0 ECRSFD=0 LM=0 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+ETH_MACHWF1R = 0x11041904: TSOEN [18] = 1
+[8] TSO:
+      ETH_DMACTXCR (TSE)           @0x40029104 = 0x00081010
+        -> ST=0 OSF=1 TSE=1 TXPBL=8
+Init MAC Internal Loopback
+[8] MAC loopback: ETH_MACCR.LM = 1 (bit 12), TX goes back to RX inside the MAC
+      ETH_MACCR                    @0x40028000 = 0x0031F000
+        -> RE=0 TE=0 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] Start DMA: ST = 1 (TX), SR = 1 (RX)
+      ETH_DMACTXCR                 @0x40029104 = 0x00081011
+        -> ST=1 OSF=1 TSE=1 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081201
+        -> SR=1 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMADSR (TPS/RPS)         @0x4002900C = 0x00000300
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E080 = tx_desc[0] | RX 0x2400E0C0 = rx_desc[0]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+[8] Start MAC: TE = 1, RE = 1
+      ETH_MACCR                    @0x40028000 = 0x0031F003
+        -> RE=1 TE=1 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] MAC: CST=1 ACS=1 LM=1 (loopback) FES=1 (100M) DM=1 (full duplex) TE=1 RE=1
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+      MMC: TX good=0  TX 1-collision=0  TX multi-collision=0 | RX unicast good=0  RX CRC err=0  RX align err=0
+
+================ TSO TEST (MSS context descriptor, TDES3.TSE, ETH_DMACTXCR.TSE) ================
+  one TCP/IP frame in one descriptor (header 54 bytes in buffer 1, payload in buffer 2, TSE = 1)
+  comes back as frames of <= MSS payload bytes. IP.len / ID / TCP.seq / flags per segment as RM0399 Table 567;
+  both checksums were sent as 0, so a good one is the MAC's work. Case A prints the [10]/[11] FLOW lines.
+  id    len  IP.len  ID      TCP.seq flags  ip.csum tcp.csum payload | result
+  A  MSS 1000, payload 3000 -> expect 3 frame(s): 3 equal segments
+[10] tx_desc[0] = context descriptor MSS: TDES2=0x000003E8 (MSS=1000) TDES3=0xC4000000 (OWN CTXT TCMSSV), no tail write yet
+
+================ [10] Send 1 TSO frame (TX)   (t = 796 ms) ================
+[10] tx_desc[1]: TDES0=0x2400B780 (header) TDES1=0x2400B7B6 (payload) TDES2=0x0BB80036 (HL=54 B2L=3000)
+[10] TDES3=0xB02C0BB8 (OWN FD LD TSE, THL=5 words, TPL=3000 bytes): the DMA cuts TPL into MSS pieces
+[10] Write TX tail = &tx_desc[2], then poll OWN: OWN = 0 only after the last segment
+[10] Poll done after 134 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+
+================ [11] Receive 1 frame (RX)   (t = 848 ms) ================
+[11] rx_desc[0] OWN = 0 -> the DMA is done: RDES3=0x3001041E (CTXT=0 FD=1 LD=1 ES=0 PL=1054)
+        -> PL=1054 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24004A40 RDES1=0x00000000 RDES2=0x00000000 (write-back format)
+[11] Give rx_desc[0] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[0], next rx_head = 1
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E0A0 = tx_desc[2] | RX 0x2400E0F0 = rx_desc[3]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=3  TX 1-collision=0  TX multi-collision=0 | RX unicast good=3  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 000003E8 40000000  [CPU]
+      tx_desc[1] @0x2400E090:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[3] @0x2400E0B0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 3001041E  [CPU] <- rx_head
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 3001041E  [CPU]
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA] <- DMA
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA]
+  A.0  1054  1040  0x1234  +0      0x10   OK      OK       OK    | OK 
+
+================ [11] Receive 1 frame (RX)   (t = 1043 ms) ================
+[11] rx_desc[1] OWN = 0 -> the DMA is done: RDES3=0x3001041E (CTXT=0 FD=1 LD=1 ES=0 PL=1054)
+        -> PL=1054 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24005340 RDES1=0x00000000 RDES2=0x00000000 (write-back format)
+[11] Give rx_desc[1] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[1], next rx_head = 2
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E0A0 = tx_desc[2] | RX 0x2400E0F0 = rx_desc[3]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=3  TX 1-collision=0  TX multi-collision=0 | RX unicast good=3  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 000003E8 40000000  [CPU]
+      tx_desc[1] @0x2400E090:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[3] @0x2400E0B0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA]
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 3001041E  [CPU] <- rx_head
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA] <- DMA
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA]
+  A.1  1054  1040  0x1235  +1000   0x10   OK      OK       OK    | OK 
+
+================ [11] Receive 1 frame (RX)   (t = 1239 ms) ================
+[11] rx_desc[2] OWN = 0 -> the DMA is done: RDES3=0x3001041E (CTXT=0 FD=1 LD=1 ES=0 PL=1054)
+        -> PL=1054 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24005C40 RDES1=0x00000000 RDES2=0x00000000 (write-back format)
+[11] Give rx_desc[2] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[2], next rx_head = 3
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E0A0 = tx_desc[2] | RX 0x2400E0F0 = rx_desc[3]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=3  TX 1-collision=0  TX multi-collision=0 | RX unicast good=3  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 000003E8 40000000  [CPU]
+      tx_desc[1] @0x2400E090:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[3] @0x2400E0B0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA]
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 81000000  [DMA]
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA] <- rx_head <- DMA
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA]
+  A.2  1054  1040  0x1236  +2000   0x18   OK      OK       OK    | OK 
+  A  extra frame: none, MMC TX good +3, ctx TDES3 0x40000000 | OK 
+  B  MSS 1460, payload 3000 -> expect 3 frame(s): new context: 1460 + 1460 + 80
+  B.0  1514  1500  0x1234  +0      0x10   OK      OK       OK    | OK 
+  B.1  1514  1500  0x1235  +1460   0x10   OK      OK       OK    | OK 
+  B.2   134   120  0x1236  +2920   0x18   OK      OK       OK    | OK 
+  B  extra frame: none, MMC TX good +3, ctx TDES3 0x40000000 | OK 
+  C  MSS 1460, payload 500 -> expect 1 frame(s): no new context, payload <= MSS: not cut, checksums filled
+  C.0   554   540  0x1234  +0      0x18   OK      OK       OK    | OK 
+  C  extra frame: none, MMC TX good +1, ctx TDES3 - | OK 
+
+Result: 3/3 cases as expected.
+Stats for MAC-idx: 0
+RX_MAC(unicast good/crc err/align err): 7 0 0
+TX_MAC(good/single col/multi col): 7 0 0
+[L1] ======== RMII[0] - END TEST ========
+
+[L1] ======== PASS ========
+
+
+============ L0_MK_RMII_MAC_LOOPBACK ============
+Press USER to run the test again
+
+================ [1] Board: HAL, clock, UART, USER button   (t = 8 ms) ================
+[1] HAL + SystemClock_Config done: SystemCoreClock = 224000000 Hz, HCLK = 224000000 Hz
+[1] UART COM1 115200-8N1, USER button = EXTI interrupt
+      Chip: DBGMCU_IDCODE=0x20036450 -> DEV_ID=0x450 (0x450 = STM32H74x/75x), REV_ID=0x2003
+      Core: SCB->CPUID=0x411FC271 -> Cortex-M7 r1p1
+      Clock: SYSCLK=224000000 HCLK=224000000 PCLK1=56000000 PCLK2=112000000 Hz
+      Cache: I-cache=0 D-cache=0 (SCB->CCR bit 17/16)
+RMII[0] MAC Loopback Test
+[L1] ======== RMII[0] - START TEST ========
+
+
+================ [2] DMA memory check: D-cache must be OFF   (t = 61 ms) ================
+[2] Descriptor 16 bytes; ring TX 4, RX 8; buffer 2304 bytes -> tx_buf 9216 B, rx_buf 18432 B
+[2] D-cache OFF (SCB->CCR = 0x00040200, bit DC = 0) -> CPU and DMA see the same RAM
+
+================ [3] DWT, RMII pins (AF11), SYSCFG = RMII, ETH clocks and reset   (t = 86 ms) ================
+[3] DWT CYCCNT counting (CYCCNT = 19)
+[3] Clock GPIOA/B/C/G + SYSCFG ON
+[3] Pin PA1  REF_CLK -> AF11 (MODER=0xABFFFFFB AFR[0]=0x000000B0)
+[3] Pin PA2  MDIO    -> AF11 (MODER=0xABFFFFEB AFR[0]=0x00000BB0)
+[3] Pin PA7  CRS_DV  -> AF11 (MODER=0xABFFBFEB AFR[0]=0xB0000BB0)
+[3] Pin PC1  MDC     -> AF11 (MODER=0xF3FFFFFB AFR[0]=0x000000B0)
+[3] Pin PC4  RXD0    -> AF11 (MODER=0xF3FFFEFB AFR[0]=0x000B00B0)
+[3] Pin PC5  RXD1    -> AF11 (MODER=0xF3FFFAFB AFR[0]=0x00BB00B0)
+[3] Pin PB13 TXD1    -> AF11 (MODER=0xFBFFFEBF AFR[1]=0x00B00000)
+[3] Pin PG11 TX_EN   -> AF11 (MODER=0xFFBFFFFF AFR[1]=0x0000B000)
+[3] Pin PG13 TXD0    -> AF11 (MODER=0xFBBFFFFF AFR[1]=0x00B0B000)
+[3] SYSCFG_PMCR = 0x03800000 -> EPIS = 4 (4 = RMII)
+[3] RCC_AHB1ENR = 0x00038000 (ETH1MAC/TX/RX clocks ON), ETH block reset by RCC
+[3] RCC_AHB1RSTR = 0x00000000 (ETH1MACRST = 0, must be 0)
+[3] ETH interrupt OFF (the test polls the descriptors)
+Start Init: Port[0]
+
+================ [4] Read version, software reset DMA/MTL/MAC, 1 us tick   (t = 183 ms) ================
+MAC version: 0x00003142
+[4] Write ETH_DMAMR.SWR = 1 (software reset DMA/MTL/MAC), wait for the hardware to clear it...
+      ETH_DMAMR (before SWR)       @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+MAC Reset done.
+[4] SWR cleared after ~3 us -> reset done
+      ETH_DMAMR (after SWR)        @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+      ETH_MAC1USTCR                @0x400280DC = 0x000000DF
+
+================ [5] DMA channel 0: TX control, RX control, channel control, bus mode   (t = 235 ms) ================
+[5] DMA channel 0 (read back after the writes):
+      ETH_DMACTXCR                 @0x40029104 = 0x00080010
+        -> ST=0 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081200
+        -> SR=0 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMACCR                   @0x40029100 = 0x00010000
+        -> MSS=0 PBLX8=1 DSL=0
+      ETH_DMASBMR                  @0x40029004 = 0x00001001
+        -> FB=1 AAL=1 MB=0 RB=0
+      ETH_DMACIER                  @0x40029134 = 0x00000000
+
+================ [6] Descriptors, register the rings with the DMA   (t = 291 ms) ================
+[6] tx_desc @0x2400E080  rx_desc @0x2400E0C0  (16 bytes/descriptor, TX 4, RX 8)
+[6] tx_buf  @0x24002640  rx_buf  @���� �
+============ L0_MK_RMII_MAC_LOOPBACK ============
+Press USER to run the test again
+
+================ [1] Board: HAL, clock, UART, USER button   (t = 8 ms) ================
+[1] HAL + SystemClock_Config done: SystemCoreClock = 224000000 Hz, HCLK = 224000000 Hz
+[1] UART COM1 115200-8N1, USER button = EXTI interrupt
+      Chip: DBGMCU_IDCODE=0x20036450 -> DEV_ID=0x450 (0x450 = STM32H74x/75x), REV_ID=0x2003
+      Core: SCB->CPUID=0x411FC271 -> Cortex-M7 r1p1
+      Clock: SYSCLK=224000000 HCLK=224000000 PCLK1=56000000 PCLK2=112000000 Hz
+      Cache: I-cache=0 D-cache=0 (SCB->CCR bit 17/16)
+RMII[0] MAC Loopback Test
+[L1] ======== RMII[0] - START TEST ========
+
+
+================ [2] DMA memory check: D-cache must be OFF   (t = 61 ms) ================
+[2] Descriptor 16 bytes; ring TX 4, RX 8; buffer 2304 bytes -> tx_buf 9216 B, rx_buf 18432 B
+[2] D-cache OFF (SCB->CCR = 0x00040200, bit DC = 0) -> CPU and DMA see the same RAM
+
+================ [3] DWT, RMII pins (AF11), SYSCFG = RMII, ETH clocks and reset   (t = 86 ms) ================
+[3] DWT CYCCNT counting (CYCCNT = 19)
+[3] Clock GPIOA/B/C/G + SYSCFG ON
+[3] Pin PA1  REF_CLK -> AF11 (MODER=0xABFFFFFB AFR[0]=0x000000B0)
+[3] Pin PA2  MDIO    -> AF11 (MODER=0xABFFFFEB AFR[0]=0x00000BB0)
+[3] Pin PA7  CRS_DV  -> AF11 (MODER=0xABFFBFEB AFR[0]=0xB0000BB0)
+[3] Pin PC1  MDC     -> AF11 (MODER=0xF3FFFFFB AFR[0]=0x000000B0)
+[3] Pin PC4  RXD0    -> AF11 (MODER=0xF3FFFEFB AFR[0]=0x000B00B0)
+[3] Pin PC5  RXD1    -> AF11 (MODER=0xF3FFFAFB AFR[0]=0x00BB00B0)
+[3] Pin PB13 TXD1    -> AF11 (MODER=0xFBFFFEBF AFR[1]=0x00B00000)
+[3] Pin PG11 TX_EN   -> AF11 (MODER=0xFFBFFFFF AFR[1]=0x0000B000)
+[3] Pin PG13 TXD0    -> AF11 (MODER=0xFBBFFFFF AFR[1]=0x00B0B000)
+[3] SYSCFG_PMCR = 0x03800000 -> EPIS = 4 (4 = RMII)
+[3] RCC_AHB1ENR = 0x00038000 (ETH1MAC/TX/RX clocks ON), ETH block reset by RCC
+[3] RCC_AHB1RSTR = 0x00000000 (ETH1MACRST = 0, must be 0)
+[3] ETH interrupt OFF (the test polls the descriptors)
+Start Init: Port[0]
+
+================ [4] Read version, software reset DMA/MTL/MAC, 1 us tick   (t = 183 ms) ================
+MAC version: 0x00003142
+[4] Write ETH_DMAMR.SWR = 1 (software reset DMA/MTL/MAC), wait for the hardware to clear it...
+      ETH_DMAMR (before SWR)       @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+MAC Reset done.
+[4] SWR cleared after ~3 us -> reset done
+      ETH_DMAMR (after SWR)        @0x40029000 = 0x00000000
+        -> SWR=0 DA=0 TXPR=0 PR=0 INTM=0
+      ETH_MAC1USTCR                @0x400280DC = 0x000000DF
+
+================ [5] DMA channel 0: TX control, RX control, channel control, bus mode   (t = 234 ms) ================
+[5] DMA channel 0 (read back after the writes):
+      ETH_DMACTXCR                 @0x40029104 = 0x00080010
+        -> ST=0 OSF=1 TSE=0 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081200
+        -> SR=0 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMACCR                   @0x40029100 = 0x00010000
+        -> MSS=0 PBLX8=1 DSL=0
+      ETH_DMASBMR                  @0x40029004 = 0x00001001
+        -> FB=1 AAL=1 MB=0 RB=0
+      ETH_DMACIER                  @0x40029134 = 0x00000000
+
+================ [6] Descriptors, register the rings with the DMA   (t = 291 ms) ================
+[6] tx_desc @0x2400E080  rx_desc @0x2400E0C0  (16 bytes/descriptor, TX 4, RX 8)
+[6] tx_buf  @0x24002640  rx_buf  @0x24004A40  (2304 bytes/buffer)
+[6] rx_desc[0]: des0=0x24004A40 (= rx_buf[0])  des3=0x81000000 (OWN|BUF1V)
+        -> BUF1V=1 BUF2V=0 IOC=0 OWN=1
+[6] Ring registers:
+      ETH_DMACTXDLAR (&tx_desc[0]) @0x40029114 = 0x2400E080
+      ETH_DMACTXRLR (count - 1)    @0x4002912C = 0x00000003
+      ETH_DMACRXDLAR (&rx_desc[0]) @0x4002911C = 0x2400E0C0
+      ETH_DMACRXRLR (count - 1)    @0x40029130 = 0x00000007
+      ETH_DMACTXDTPR (TX tail)     @0x40029120 = 0x2400E080
+      ETH_DMACRXDTPR (RX tail)     @0x40029128 = 0x2400E130
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=0 Stopped
+      DMA is at: TX 0x2400E080 = tx_desc[0] | RX 0x2400E0C0 = rx_desc[0]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      --- Descriptor rings (after init) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[1] @0x2400E090:  00000000 00000000 00000000 00000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 00000000 00000000  [CPU]
+      tx_desc[3] @0x2400E0B0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA] <- rx_head <- DMA
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 81000000  [DMA]
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA]
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA] <- RX tail
+
+================ [7] MTL: TX/RX queue 0 (FIFO between DMA and MAC)   (t = 485 ms) ================
+[7] MTL queue 0:
+      ETH_MTLTXQOMR                @0x40028D00 = 0x00070008
+        -> FTQ=0 TSF=0 TXQEN=2 TTC=0 TQS=7
+      ETH_MTLRXQOMR                @0x40028D30 = 0x00700040
+        -> RTC=0 FUP=0 FEP=0 RSF=0 DIS_TCP_EF=1 RQS=7
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+
+================ [8] MAC: filter, address, watchdog, MACCR; loopback; start (DMA first, MAC last)   (t = 526 ms) ================
+[8] MAC:
+      ETH_MACPFR                   @0x40028008 = 0x00000001
+        -> PR=1 HUC=0 HMC=0 DAIF=0 PM=0 DBF=0 PCF=0 SAIF=0 SAF=0 HPF=0 RA=0
+      ETH_MACA0HR (byte 5:4)       @0x40028300 = 0x80000000   (written 0x00000000)
+      ETH_MACA0LR (byte 3:0)       @0x40028304 = 0x00E18000
+      ETH_MACWTR                   @0x4002800C = 0x00000100
+        -> WTO=0 PWE=1
+      ETH_MACCR (TE/RE off)        @0x40028000 = 0x0031E000   (written 0x00316000)
+        -> RE=0 TE=0 PRELEN=0 DO=0 ECRSFD=0 LM=0 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+ETH_MACHWF1R = 0x11041904: TSOEN [18] = 1
+[8] TSO:
+      ETH_DMACTXCR (TSE)           @0x40029104 = 0x00081010
+        -> ST=0 OSF=1 TSE=1 TXPBL=8
+Init MAC Internal Loopback
+[8] MAC loopback: ETH_MACCR.LM = 1 (bit 12), TX goes back to RX inside the MAC
+      ETH_MACCR                    @0x40028000 = 0x0031F000
+        -> RE=0 TE=0 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] Start DMA: ST = 1 (TX), SR = 1 (RX)
+      ETH_DMACTXCR                 @0x40029104 = 0x00081011
+        -> ST=1 OSF=1 TSE=1 TXPBL=8
+      ETH_DMACRXCR                 @0x40029108 = 0x00081201
+        -> SR=1 RBSZ=2304 RXPBL=8 RPF=0
+      ETH_DMADSR (TPS/RPS)         @0x4002900C = 0x00000300
+      DMA TX: TPS0=0 Stopped                                | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E080 = tx_desc[0] | RX 0x2400E0C0 = rx_desc[0]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000000
+        -> TI=0 TPS=0 TBU=0 RI=0 RBU=0 RPS=0 RWT=0 ETI=0 ERI=0 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+[8] Start MAC: TE = 1, RE = 1
+      ETH_MACCR                    @0x40028000 = 0x0031F003
+        -> RE=1 TE=1 PRELEN=0 DO=0 ECRSFD=0 LM=1 DM=1 FES=1 JE=1 JD=0 WD=0 ACS=1 CST=1 S2KP=0 GPSLCE=0 IPG=0 IPC=0
+[8] MAC: CST=1 ACS=1 LM=1 (loopback) FES=1 (100M) DM=1 (full duplex) TE=1 RE=1
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+      MMC: TX good=0  TX 1-collision=0  TX multi-collision=0 | RX unicast good=0  RX CRC err=0  RX align err=0
+
+================ TSO TEST (MSS context descriptor, TDES3.TSE, ETH_DMACTXCR.TSE) ================
+  one TCP/IP frame in one descriptor (header 54 bytes in buffer 1, payload in buffer 2, TSE = 1)
+  comes back as frames of <= MSS payload bytes. IP.len / ID / TCP.seq / flags per segment as RM0399 Table 567;
+  both checksums were sent as 0, so a good one is the MAC's work. Case A prints the [10]/[11] FLOW lines.
+  id    len  IP.len  ID      TCP.seq flags  ip.csum tcp.csum payload | result
+  A  MSS 1000, payload 3000 -> expect 3 frame(s): 3 equal segments
+  A.0  1054  1040  0x1234  +0      0x10   OK      OK       OK    | OK 
+  A.1  1054  1040  0x1235  +1000   0x10   OK      OK       OK    | OK 
+  A.2  1054  1040  0x1236  +2000   0x18   OK      OK       OK    | OK 
+  A  extra frame: none, MMC TX good +3, ctx TDES3 0x40000000 | OK 
+  B  MSS 1460, payload 3000 -> expect 3 frame(s): new context: 1460 + 1460 + 80
+[10] tx_desc[2] = context descriptor MSS: TDES2=0x000005B4 (MSS=1460) TDES3=0xC4000000 (OWN CTXT TCMSSV), no tail write yet
+
+================ [10] Send 1 TSO frame (TX)   (t = 835 ms) ================
+[10] tx_desc[3]: TDES0=0x2400B780 (header) TDES1=0x2400B7B6 (payload) TDES2=0x0BB80036 (HL=54 B2L=3000)
+[10] TDES3=0xB02C0BB8 (OWN FD LD TSE, THL=5 words, TPL=3000 bytes): the DMA cuts TPL into MSS pieces
+[10] Write TX tail = &tx_desc[0], then poll OWN: OWN = 0 only after the last segment
+[10] Poll done after 134 us: TDES3 write-back = 0x30000000 (OWN=0 ES=0)
+        -> IHE=0 DB=0 UF=0 ED=0 CC=0 EC=0 LC=0 NC=0 LoC=0 PCE=0 FF=0 JT=0 ES=0 TTSS=0 LD=1 FD=1 CTXT=0 OWN=0
+
+================ [11] Receive 1 frame (RX)   (t = 886 ms) ================
+[11] rx_desc[3] OWN = 0 -> the DMA is done: RDES3=0x300105EA (CTXT=0 FD=1 LD=1 ES=0 PL=1514)
+        -> PL=1514 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24006540 RDES1=0x00000000 RDES2=0x00000000 (write-back format)
+[11] Give rx_desc[3] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[3], next rx_head = 4
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E080 = tx_desc[0] | RX 0x2400E120 = rx_desc[6]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=6  TX 1-collision=0  TX multi-collision=0 | RX unicast good=6  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 000003E8 40000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[1] @0x2400E090:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 000005B4 40000000  [CPU]
+      tx_desc[3] @0x2400E0B0:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA]
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 81000000  [DMA]
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 300105EA  [CPU] <- rx_head
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 30010086  [CPU]
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA] <- DMA
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA]
+  B.0  1514  1500  0x1234  +0      0x10   OK      OK       OK    | OK 
+
+================ [11] Receive 1 frame (RX)   (t = 1082 ms) ================
+[11] rx_desc[4] OWN = 0 -> the DMA is done: RDES3=0x300105EA (CTXT=0 FD=1 LD=1 ES=0 PL=1514)
+        -> PL=1514 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24006E40 RDES1=0x00000000 RDES2=0x00000000 (write-back format)
+[11] Give rx_desc[4] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[4], next rx_head = 5
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E080 = tx_desc[0] | RX 0x2400E120 = rx_desc[6]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=6  TX 1-collision=0  TX multi-collision=0 | RX unicast good=6  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 000003E8 40000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[1] @0x2400E090:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 000005B4 40000000  [CPU]
+      tx_desc[3] @0x2400E0B0:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA]
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 81000000  [DMA]
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA]
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 30010086  [CPU] <- rx_head
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA] <- DMA
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA]
+  B.1  1514  1500  0x1235  +1460   0x10   OK      OK       OK    | OK 
+
+================ [11] Receive 1 frame (RX)   (t = 1278 ms) ================
+[11] rx_desc[5] OWN = 0 -> the DMA is done: RDES3=0x30010086 (CTXT=0 FD=1 LD=1 ES=0 PL=134)
+        -> PL=134 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24007740 RDES1=0x00000000 RDES2=0x00000000 (write-back format)
+[11] Give rx_desc[5] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[5], next rx_head = 6
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x2400E080 = tx_desc[0] | RX 0x2400E120 = rx_desc[6]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=6  TX 1-collision=0  TX multi-collision=0 | RX unicast good=6  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x2400E080:  00000000 00000000 000003E8 40000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[1] @0x2400E090:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      tx_desc[2] @0x2400E0A0:  00000000 00000000 000005B4 40000000  [CPU]
+      tx_desc[3] @0x2400E0B0:  2400B780 2400B7B6 0BB80036 30000000  [CPU]
+      rx_desc[0] @0x2400E0C0:  24004A40 00000000 00000000 81000000  [DMA]
+      rx_desc[1] @0x2400E0D0:  24005340 00000000 00000000 81000000  [DMA]
+      rx_desc[2] @0x2400E0E0:  24005C40 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x2400E0F0:  24006540 00000000 00000000 81000000  [DMA]
+      rx_desc[4] @0x2400E100:  24006E40 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x2400E110:  24007740 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[6] @0x2400E120:  24008040 00000000 00000000 81000000  [DMA] <- rx_head <- DMA
+      rx_desc[7] @0x2400E130:  24008940 00000000 00000000 81000000  [DMA]
+  B.2   134   120  0x1236  +2920   0x18   OK      OK       OK    | OK 
+  B  extra frame: none, MMC TX good +3, ctx TDES3 0x40000000 | OK 
+  C  MSS 1460, payload 500 -> expect 1 frame(s): no new context, payload <= MSS: not cut, checksums filled
+  C.0   554   540  0x1234  +0      0x18   OK      OK       OK    | OK 
+  C  extra frame: none, MMC TX good +1, ctx TDES3 - | OK 
+
+Result: 3/3 cases as expected.
+Stats for MAC-idx: 0
+RX_MAC(unicast good/crc err/align err): 7 0 0
+TX_MAC(good/single col/multi col): 7 0 0
+[L1] ======== RMII[0] - END TEST ========
+
+[L1] ======== PASS ========
+

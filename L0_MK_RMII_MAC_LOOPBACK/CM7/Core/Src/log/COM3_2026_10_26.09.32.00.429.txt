@@ -1,0 +1,52 @@
+d: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x24008BB0 = tx_desc[1] | RX 0x24008BF0 = rx_desc[1]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MAC: TX engine idle, TFCSTS=0 Idle | RX engine idle
+
+================ [11] Receive 1 frame (RX)   (t = 979 ms) ================
+[11] rx_desc[0] OWN = 0 -> the DMA is done: RDES3=0x3001004C (CTXT=0 FD=1 LD=1 ES=0 PL=76)
+        -> PL=76 ES=0 LT=1 DE=0 RE=0 OE=0 RWT=0 GP=0 CE=0 RS0V=0 RS1V=0 RS2V=0 LD=1 FD=1 CTXT=0 OWN=0
+[11] RDES0=0x24002F80 RDES1=0x00000000 RDES2=0x00000000 (write-back format)
+[11] Give rx_desc[0] back to the DMA (RDES3=0x81000000), RX tail = &rx_desc[0], next rx_head = 1
+      DMA TX: TPS0=6 Suspended: no descriptor or underflow  | DMA RX: RPS0=3 Running: waiting for packet
+      DMA is at: TX 0x24008BB0 = tx_desc[1] | RX 0x24008BF0 = rx_desc[1]
+      ETH_DMACSR (status)          @0x40029160 = 0x00000C04
+        -> TI=0 TPS=0 TBU=1 RI=0 RBU=0 RPS=0 RWT=0 ETI=1 ERI=1 FBE=0 CDE=0 AIS=0 NIS=0 TEB=0 REB=0
+      MTL TX FIFO: empty, TRCSTS=0 Idle
+      MTL RX FIFO: PRXQ=0 packets, RXQSTS=0 empty, RRCSTS=0 Idle
+      MMC: TX good=1  TX 1-collision=0  TX multi-collision=0 | RX unicast good=1  RX CRC err=0  RX align err=0
+      --- Descriptor rings (after RX) ---       DES0     DES1     DES2     DES3
+      tx_desc[0] @0x24008BA0:  24000B80 00000000 0000004C 30000000  [CPU]
+      tx_desc[1] @0x24008BB0:  00000000 00000000 00000000 00000000  [CPU] <- tx_head <- TX tail <- DMA
+      tx_desc[2] @0x24008BC0:  00000000 00000000 00000000 00000000  [CPU]
+      tx_desc[3] @0x24008BD0:  00000000 00000000 00000000 00000000  [CPU]
+      rx_desc[0] @0x24008BE0:  24002F80 00000000 00000000 81000000  [DMA] <- RX tail
+      rx_desc[1] @0x24008BF0:  24003880 00000000 00000000 81000000  [DMA] <- rx_head <- DMA
+      rx_desc[2] @0x24008C00:  24004180 00000000 00000000 81000000  [DMA]
+      rx_desc[3] @0x24008C10:  24004A80 00000000 00000000 81000000  [DMA]
+      rx_desc[4] @0x24008C20:  24005380 00000000 00000000 81000000  [DMA]
+      rx_desc[5] @0x24008C30:  24005C80 00000000 00000000 81000000  [DMA]
+      rx_desc[6] @0x24008C40:  24006580 00000000 00000000 81000000  [DMA]
+      rx_desc[7] @0x24008C50:  24006E80 00000000 00000000 81000000  [DMA]
+.
+[11] Compare with the frame sent (76 bytes): SAME -> loopback OK
+      [11] rxbuff (copy of rx_buf): 76 bytes @0x24008088
+        [   0..   5] Dest MAC : 6C 1F F7 CA 2B FD
+        [   6..  11] Src MAC  : 00 80 E1 00 00 00
+        [  12..  13] EtherType: 88 B5
+        [  14..  75] Payload  : AA AB AC AD AE AF B0 B1 B2 B3 B4 B5 B6 B7 B8 B9
+                                BA BB BC BD BE BF C0 C1 C2 C3 C4 C5 C6 C7 C8 C9
+                                CA CB CC CD CE CF D0 D1 D2 D3 D4 D5 D6 D7 D8 D9
+                                DA DB DC DD DE DF E0 E1 E2 E3 E4 E5 E6 E7
+...............
+[L1] Traffic test finished. Tx/Rx Stats: Actual/Expected 16/16
+Stats for MAC-idx: 0
+RX_MAC(unicast good/crc err/align err): 16 0 0
+TX_MAC(good/single col/multi col): 16 0 0
+[L1] ======== RMII[0] - END TEST ========
+
+[L1] ======== PASS ========
+

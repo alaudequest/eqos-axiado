@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interrupt status: mode 12</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1d1f;--muted:#5d636b;--line:#cdd0d5;--card:#ffffff;--accent:#0b63c5;--accent-bg:#e2eefb;
+--warn:#a8590a;--warn-bg:#fdf0d0;--ok:#157a3b;--ok-bg:#e0f3e6;--bad:#b3261e;--bad-bg:#fbe4e2;--code:#f0f1f3;--g:#6b3fb3;--g-bg:#efe8fb;--t:#0f766e;--t-bg:#dcf2ef}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:60px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:6px;align-items:center;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:13.5px;flex-wrap:wrap}
+.top .brand{font-weight:700;margin-right:12px;white-space:nowrap}
+.top a{padding:4px 12px;border-radius:99px;text-decoration:none;color:var(--fg);border:1px solid var(--line);white-space:nowrap}
+.top a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 80px;min-width:0}
+h1{font-size:28px;margin:0 0 6px;line-height:1.25}
+h2{font-size:21px;margin:48px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:26px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:15.5px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+.case{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:12px 18px;margin:18px 0}
+.case.drop{border-left-color:var(--bad)}
+.case h3{margin:4px 0 8px}
+.case pre{margin:4px 0;font-size:12.5px;line-height:1.4}
+.case .tag{display:inline-block;font-size:12.5px;padding:1px 9px;border-radius:99px;border:1px solid var(--line);margin-left:8px;vertical-align:middle;font-weight:500}
+.case .tag.p{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.case .tag.d{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.tip{border-left:4px solid var(--ok);background:var(--ok-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.warn{border-left:4px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.mem{border-left:4px solid var(--g);background:var(--g-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:15.5px}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.5;margin:10px 0}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-bg)}
+td.c{text-align:center}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.toc{columns:2;column-gap:28px;font-size:14px}
+.toc a{text-decoration:none}
+svg{width:100%;height:auto;display:block;margin:12px 0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+svg text{fill:var(--fg);font-size:13px}
+svg .m{fill:var(--muted);font-size:12px}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+svg .b{font-weight:700}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .reg{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.4}
+svg .mac{fill:var(--t-bg);stroke:var(--t);stroke-width:1.4}
+svg .okb{fill:var(--ok-bg);stroke:var(--ok);stroke-width:1.4}
+svg .badb{fill:var(--bad-bg);stroke:var(--bad);stroke-width:1.4}
+svg .byt{fill:var(--code);stroke:var(--line);stroke-width:1}
+svg .s{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1}
+svg .cc{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1}
+svg .ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+svg .ln2{stroke:var(--muted);stroke-width:1.1;fill:none;stroke-dasharray:4 3}
+@media (max-width:600px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="top"><span class="brand">MAC loopback</span>
+<a href="MAC_LOOPBACK_filter.html">Table filter (mode 1)</a><a href="MAC_LOOPBACK_burst.html">DMA burst (mode 2)</a><a href="MAC_LOOPBACK_ptp.html">PTP (mode 3)</a><a href="MAC_LOOPBACK_vlan_tag.html">VLAN tag (mode 4, 5)</a><a href="MAC_LOOPBACK_tso.html">TSO (mode 6)</a><a href="MAC_LOOPBACK_coe.html">Checksum (mode 7)</a><a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a><a href="MAC_LOOPBACK_sa_cpc.html">SA / CRC (mode 10)</a><a href="MAC_LOOPBACK_addr_filter.html">Address filter (mode 11)</a><a class="on" href="#">Interrupts: status (mode 12)</a></div>
+<main>
+<h1>Interrupt status with no interrupts enabled: mode 12 case by case</h1>
+<p class="lead">Cheat sheet for <code>eth_run_test_ops = 12</code> (<code>eth_mac_int_status_lb</code>, file <code>eth_istat_functions.c</code>). STM32H755, RM0399 Rev 4. Written 2026-11-19, not run on the board yet: section 8 is waiting for a log. The test's requirement: <b>no interrupt enabled at all</b> (ETH_DMACIER = 0, ETH_MACIER = 0, the ETH_MTLQICSR enables = 0, NVIC untouched); it only checks whether the <i>status</i> registers reflect events and how they are cleared.</p>
+
+<div class="mem"><b>Mnemonic:</b> <i>Status and interrupt are two layers. An event always sets its status bit (TI, RBU, FBE…) even with enable = 0; only AIS / NIS and the NVIC interrupt line need an enable. Clearing status: write 1 (DMA, MTL), read (counters, MAC). A descriptor that does not request IOC produces no TI / RI.</i></div>
+
+<div class="card toc">
+<a href="#idea">1. What mode 12 tests</a><br>
+<a href="#layers">2. Two layers: status and interrupt</a><br>
+<a href="#dmacsr">3. ETH_DMACSR bit by bit</a><br>
+<a href="#summary">4. The AIS / NIS rule (p.3094)</a><br>
+<a href="#ioc">5. IOC and the descriptor the DMA is holding</a><br>
+<a href="#run">6. How one case runs, reading the status line</a><br>
+<a href="#cases">7. Ten cases</a><br>
+<a href="#lessons">8. Lessons from the board</a><br>
+<a href="#bits">9. Bit table for lookup</a><br>
+<a href="#todo">10. Cases worth adding</a>
+</div>
+
+
+<h2 id="idea">1. What mode 12 tests</h2>
+<p>The previous eleven modes all poll the descriptor's OWN bit; nobody looks at ETH_DMACSR unless there is an error. A real driver lives on these bits: the ISR reads DMACSR, decides "new frame", "out of descriptors", "bus error", then writes 1 to clear. Before enabling real interrupts, mode 12 asks: <b>does the status bit come up at the right moment, which bit comes up, how is it cleared, and with nothing enabled do AIS / NIS stay quiet</b>. Each case creates one event (a frame, running out of descriptors, FIFO overflow, an oversized frame, a stop command, a bus error) and then reads six registers.</p>
+<svg viewBox="0 0 960 300" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<rect x="10" y="20" width="170" height="60" rx="8" class="mac"/><text x="95" y="45" text-anchor="middle" class="b">DMA channel 0</text><text x="95" y="65" text-anchor="middle" class="m">TI TBU RI RBU RWT FBE…</text>
+<rect x="10" y="100" width="170" height="60" rx="8" class="mac"/><text x="95" y="125" text-anchor="middle" class="b">MTL queue 0</text><text x="95" y="145" text-anchor="middle" class="m">RX overflow, TX underflow</text>
+<rect x="10" y="180" width="170" height="60" rx="8" class="mac"/><text x="95" y="205" text-anchor="middle" class="b">MAC</text><text x="95" y="225" text-anchor="middle" class="m">RWT, timestamp, MMC, PHY</text>
+<path d="M180 50 H235" class="ln" marker-end="url(#a)"/><path d="M180 130 H235" class="ln" marker-end="url(#a)"/><path d="M180 210 H235" class="ln" marker-end="url(#a)"/>
+<rect x="238" y="20" width="200" height="60" rx="8" class="reg"/><text x="338" y="45" text-anchor="middle" class="b">ETH_DMACSR p.3093</text><text x="338" y="65" text-anchor="middle" class="m">status, rc_w1 · AIS NIS = summary</text>
+<rect x="238" y="100" width="200" height="60" rx="8" class="reg"/><text x="338" y="125" text-anchor="middle" class="b">ETH_MTLQICSR p.3104</text><text x="338" y="145" text-anchor="middle" class="m">RXOVFIS TXUNFIS rc_w1</text>
+<rect x="238" y="180" width="200" height="60" rx="8" class="reg"/><text x="338" y="205" text-anchor="middle" class="b">ETH_MACISR p.3131</text><text x="338" y="225" text-anchor="middle" class="m">RXSTSIS TSIS MMCIS, read to clear</text>
+<path d="M438 50 H493" class="ln" marker-end="url(#a)"/><path d="M438 130 H493" class="ln" marker-end="url(#a)"/><path d="M438 210 H493" class="ln" marker-end="url(#a)"/>
+<rect x="496" y="100" width="180" height="60" rx="8" class="reg"/><text x="586" y="125" text-anchor="middle" class="b">ETH_DMAISR p.3077</text><text x="586" y="145" text-anchor="middle" class="m">DC0IS · MTLIS · MACIS</text>
+<path d="M496 50 H586 V100" class="ln2"/><path d="M496 210 H586 V160" class="ln2"/>
+<path d="M676 130 H731" class="ln2" marker-end="url(#a)"/>
+<rect x="734" y="100" width="216" height="60" rx="8" class="box"/><text x="842" y="125" text-anchor="middle" class="b">enable: DMACIER MACIER</text><text x="842" y="145" text-anchor="middle" class="m">RXOIE TXUIE → interrupt line → NVIC</text>
+<line x1="734" y1="100" x2="950" y2="160" class="ln" stroke="var(--bad)"/><line x1="734" y1="160" x2="950" y2="100" class="ln" stroke="var(--bad)"/>
+<text x="842" y="185" text-anchor="middle" class="m">mode 12 stops before this: enable = 0</text>
+<rect x="496" y="20" width="180" height="60" rx="8" class="box"/><text x="586" y="45" text-anchor="middle" class="b">ETH_DMADSR p.3078</text><text x="586" y="65" text-anchor="middle" class="m">TPS0 / RPS0: state machine</text>
+<rect x="496" y="180" width="180" height="60" rx="8" class="box"/><text x="586" y="205" text-anchor="middle" class="b">counters, read to clear</text><text x="586" y="225" text-anchor="middle" class="m">MTLRXQMPOCR, DMACMFCR</text>
+<rect x="10" y="258" width="940" height="34" rx="8" class="cc"/><text x="480" y="280" text-anchor="middle">Each case: clear → event → read 6 registers (is_read) → compare with the "must be 1" / "must be 0" masks (is_check) → OK / BAD</text>
+</svg>
+
+<h2 id="layers">2. Two layers: status and interrupt</h2>
+<table>
+<tr><th>Block</th><th>Status register</th><th>Clear</th><th>Enable register (= 0 in the test)</th><th>Summary bit in DMAISR</th><th>RM</th></tr>
+<tr><td>DMA channel 0</td><td>ETH_DMACSR</td><td>write 1 (rc_w1); RWT is listed as "rw"</td><td>ETH_DMACIER (TIE RIE RBUE … NIE AIE)</td><td>DC0IS [0]</td><td>p.3087, p.3093</td></tr>
+<tr><td>MTL queue 0</td><td>ETH_MTLQICSR RXOVFIS [16] TXUNFIS [0]; ETH_MTLISR.Q0IS</td><td>write 1</td><td>same register: RXOIE [24] TXUIE [8]</td><td>MTLIS [16]</td><td>p.3101, p.3104</td></tr>
+<tr><td>MAC</td><td>ETH_MACISR (RXSTSIS TXSTSIS TSIS MMCIS PMTIS PHYIS)</td><td>read the source register (MACRXTXSR, MACTSSR, MMC)</td><td>ETH_MACIER</td><td>MACIS [17]</td><td>p.3131-3134</td></tr>
+<tr><td>Counters</td><td>ETH_MTLRXQMPOCR, ETH_DMACMFCR, ETH_MTLTXQUR</td><td>read</td><td>not present</td><td>no</td><td>p.3096, p.3108</td></tr>
+</table>
+
+<p>The ETH interrupt line to the NVIC (ETH_IRQn = 61) only fires when a status bit AND its enable bit are set. A complete driver: NVIC_EnableIRQ + DMACIER (NIE | AIE | TIE | RIE | RBUE | FBEE) + an ISR that reads DMACSR, writes it back to clear, then handles the event. Mode 12 deliberately does none of these steps, to separate "the hardware reports it" from "the interrupt arrives".</p>
+
+<h2 id="dmacsr">3. ETH_DMACSR bit by bit (p.3093-3095)</h2>
+<table>
+<tr><th>Bit</th><th>Name</th><th>Group</th><th>Set when</th><th>Case</th><th>Access</th></tr>
+<tr><td>0</td><td>TI</td><td>normal</td><td>a TX descriptor with IOC = 1 is closed</td><td>C</td><td>rc_w1</td></tr>
+<tr><td>1</td><td>TPS</td><td>abnormal</td><td>the TX DMA stops (ST = 0, or after FBE)</td><td>H1, I</td><td>rc_w1</td></tr>
+<tr><td>2</td><td>TBU</td><td>normal</td><td>the TX DMA meets a descriptor with OWN = 0 (no more work)</td><td>A, B</td><td>rc_w1</td></tr>
+<tr><td>6</td><td>RI</td><td>normal</td><td>an RX descriptor with IOC = 1 is closed</td><td>C</td><td>rc_w1</td></tr>
+<tr><td>7</td><td>RBU</td><td>abnormal</td><td>a frame arrives while the next RX descriptor has OWN = 0</td><td>E, F</td><td>rc_w1</td></tr>
+<tr><td>8</td><td>RPS</td><td>abnormal</td><td>the RX DMA stops (SR = 0)</td><td>H2</td><td>rc_w1</td></tr>
+<tr><td>9</td><td>RWT</td><td>abnormal</td><td>a frame longer than the watchdog limit is cut</td><td>G</td><td><b>rw</b> (?)</td></tr>
+<tr><td>10</td><td>ETI</td><td>abnormal</td><td>the frame is completely in the MTL TX FIFO</td><td>B</td><td>rc_w1</td></tr>
+<tr><td>11</td><td>ERI</td><td>normal</td><td>the DMA has finished writing the frame's first RX buffer</td><td>B</td><td>rc_w1</td></tr>
+<tr><td>12</td><td>FBE</td><td>abnormal</td><td>AHB returns an error; TEB / REB give the error type</td><td>I</td><td>rc_w1</td></tr>
+<tr><td>13</td><td>CDE</td><td>abnormal</td><td>context descriptor in the wrong place (mode 4 F)</td><td>mode 4</td><td>rc_w1</td></tr>
+<tr><td>14</td><td>AIS</td><td>abnormal summary</td><td>an <b>enabled</b> abnormal bit comes up</td><td>every case: must be 0</td><td>rc_w1</td></tr>
+<tr><td>15</td><td>NIS</td><td>normal summary</td><td>an <b>enabled</b> normal bit comes up</td><td>every case: must be 0</td><td>rc_w1</td></tr>
+<tr><td>18:16 / 21:19</td><td>TEB / REB</td><td>information</td><td>with FBE: bit 0 read/write, bit 1 descriptor/data, bit 2 data transfer</td><td>I</td><td>r</td></tr>
+</table>
+
+
+<h2 id="summary">4. The AIS / NIS rule (p.3094)</h2>
+<p>RM: <i>"Normal Interrupt Summary bit value is the logical OR of the following bits <b>when the corresponding interrupt bits are enabled</b> in the ETH_DMACIER register… Only unmasked bits affect the Normal Interrupt Summary bit."</i> The same sentence exists for AIS. So with DMACIER = 0, TI / RBU / FBE still come up but AIS / NIS = 0.</p>
+<div class="tip">The board has said it once already: mode 4 case F (2026-11-07) recorded ETH_DMACSR = 0x2C04 = TBU ETI ERI CDE, <b>AIS = 0</b>, with DMACIER = 0. Mode 12 grades "AIS = 0, NIS = 0" in every case to turn a chance observation into a checked rule.</div>
+<p>Consequence for the driver: an ISR must not look only at NIS / AIS and conclude "nothing happened" when a bit is not enabled; and clearing must clear both the source bit and the summary bit (both are sticky).</p>
+
+<h2 id="ioc">5. IOC and the descriptor the DMA is holding</h2>
+<p>TI only comes up for a TX descriptor with TDES2.IOC [31] = 1 (p.3050); RI only comes up for an RX descriptor with RDES3.IOC [30] = 1 (p.3064). The code adds two flags, <code>eth_tx_ioc</code> / <code>eth_rx_ioc</code> (like eth_tx_cic), so egress_packet and rx_desc_give_back set that bit.</p>
+<p>The trap in case C: after closing a descriptor, the RX DMA immediately <b>prefetches</b> the next one (RPS0 = 3 "waiting for packet" means it is already holding a descriptor). That descriptor was handed back in case B, without IOC. Editing RDES3 in RAM at that point is useless (and the RM forbids modifying a descriptor the DMA is holding). The clean way: send 8 frames so the ring goes all the way round, every descriptor is handed back with IOC, and only then grade the 9th frame.</p>
+<pre>RX ring (8):   [0 B][1 B][2 B][3 B][4 B][5 B][6 B][7 B]     B = handed back in case B, IOC = 0; the DMA holds [k]
+8 warm-up frames → each give-back writes IOC = 1 → [0 C][1 C]…[7 C]
+9th frame → descriptor has IOC → RDES3 closed, RI = 1</pre>
+
+<h2 id="run">6. How one case runs, reading the status line</h2>
+<table>
+<tr><th>Step</th><th>Function</th><th>What it does</th></tr>
+<tr><td>0</td><td>is_title</td><td>print id + description</td></tr>
+<tr><td>1</td><td>is_clear</td><td>ETH_DMACSR = mask of every rc_w1 bit (0xFDC7, without RWT 0x200); ETH_MTLQICSR = RXOVFIS | TXUNFIS</td></tr>
+<tr><td>2</td><td>event</td><td>is_one_frame / is_send_n / register write / hand-built descriptor</td></tr>
+<tr><td>3</td><td>udelay 200 µs</td><td>let the bits come up</td></tr>
+<tr><td>4</td><td>is_read</td><td>DMACSR, DMAISR, DMADSR, MTLISR, MTLQICSR, MACISR (MACISR last: reading it clears PHYIS)</td></tr>
+<tr><td>5</td><td>is_check</td><td>print 2 status lines + the expect line, compare DMACSR with the must-be-1 / must-be-0 masks, AND with the case's own checks</td></tr>
+</table>
+
+<pre>      ETH_DMACSR = 0x00000C04 [TBU ETI ERI]  TEB = 0 REB = 0 | DMAISR = 0x00000001 (DC0IS 1 MTLIS 0 MACIS 0) | TPS0 = 6 RPS0 = 3
+      ETH_MTLISR = 0x00000000 (Q0IS 0) | ETH_MTLQICSR = 0x00000000 (RXOVFIS 0 TXUNFIS 0) | ETH_MACISR = 0x00000000 (RXSTSIS 0 TXSTSIS 0 TSIS 0)
+      expect DMACSR: 1 = [TBU ETI ERI], 0 = [TI RI RBU AIS NIS] -> OK</pre>
+<p>The first two lines are what the board reports (the values above are an example pieced together from the mode 4 log), the third line is the expectation. The square brackets list the names of the bits that are 1, so you do not have to decode hex. DC0IS / MTLIS / MACIS / Q0IS / RXSTSIS are printed only: it is not known yet whether they come up with nothing enabled; the log will answer.</p>
+
+<h2 id="cases">7. Ten cases</h2>
+<div class="case" id="cA"><h3>A: After init + start, nothing sent yet <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>mac_init_100m → init_mac_internal_lb → mac_start. ETH_DMACIER = 0, ETH_MACIER = 0.</td></tr>
+<tr><th style="width:150px">Event</th><td>None. Read the 6 registers "as found", then write 1 to every rc_w1 bit of ETH_DMACSR (<code>is_clear</code>).</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>After clearing: every rc_w1 bit = 0. Before clearing it is only printed: TBU = 1 is normal (once started, the TX DMA meets the CPU's tx_desc[0] → suspended, TPS0 = 6).</td></tr>
+<tr><th style="width:150px">Why</th><td>The baseline case: proves that writing 1 clears, and that the test's starting state is 0.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>If TBU does not go back to 0 after clearing, the DMA may have touched a descriptor again right away (it does not without a new tail). Look at TPS0.</td></tr>
+</table></div>
+
+<div class="case" id="cB"><h3>B: One frame, IOC = 0 in both directions <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>eth_tx_ioc = 0, eth_rx_ioc = 0 (default). Prints FLOW [10]/[11].</td></tr>
+<tr><th style="width:150px">Event</th><td>Send 60 bytes, receive them back, wait 200 µs.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>1 = [TBU ETI ERI], 0 = [TI RI RBU AIS NIS]. DMAISR.DC0IS also printed.</td></tr>
+<tr><th style="width:150px">Why</th><td>ETI: the frame has entered the MTL TX FIFO; ERI: the DMA has written the first RX buffer; TBU: sending done, the DMA met the CPU's descriptor again. No TI/RI because the descriptors did not request it (IOC = 0). AIS/NIS = 0 because DMACIER = 0 (p.3094).</td></tr>
+<tr><th style="width:150px">Watch for</th><td>The mode 4 log (11-07) already gave exactly 0x2C04 = TBU ETI ERI (+CDE) with AIS = 0. Mode 12 repeats it on purpose.</td></tr>
+</table></div>
+
+<div class="case" id="cC"><h3>C: One frame, IOC = 1 in both directions <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>eth_tx_ioc = 1 (TDES2.IOC [31]), eth_rx_ioc = 1 (RDES3.IOC [30] on every descriptor handed back from now on).</td></tr>
+<tr><th style="width:150px">Event</th><td>8 warm-up frames to turn the RX ring all the way round (the old descriptors have no IOC, and the DMA already holds the next one), clear, then the 9th frame is graded.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>1 = [TI RI TBU ETI ERI], 0 = [AIS NIS].</td></tr>
+<tr><th style="width:150px">Why</th><td>TI/RI only come up when the descriptor has IOC (p.3050, p.3064). Still no NIS even though TI/RI belong to the normal group: enable = 0.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>After C, eth_rx_ioc stays 1, so RI still comes up in later cases (not graded). Lesson: do not modify a descriptor the DMA is holding; turn the ring instead.</td></tr>
+</table></div>
+
+<div class="case" id="cD"><h3>D: Write-1-to-clear, bit by bit <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>The state left over from C (TI RI TBU ETI ERI = 1).</td></tr>
+<tr><th style="width:150px">Event</th><td>Write DMACSR = TI → read; write 0 → read; write every bit → read.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>After writing TI: TI = 0, the other bits unchanged. After writing 0: no change. After writing all: 0.</td></tr>
+<tr><th style="width:150px">Why</th><td>Access column on p.3094: rc_w1. Writing 0 is harmless, so a driver can write back exactly the value it just read to clear "everything it has seen".</td></tr>
+<tr><th style="width:150px">Watch for</th><td>This is the standard way to clear in an ISR: <code>v = DMACSR; DMACSR = v;</code>. If D is BAD, that way of clearing is wrong.</td></tr>
+</table></div>
+
+<div class="case" id="cE"><h3>E: RX out of descriptors: RBU, a frame waits in the FIFO <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>RX ring of 8 descriptors. Read MTLRXQMPOCR and DMACMFCR first so the (clear-on-read) counters start at 0.</td></tr>
+<tr><th style="width:150px">Event</th><td>Send 9 frames of 60 bytes without reading any. Then read MTLRXQDR.PRXQ, MTLRXQMPOCR, DMACMFCR; after that read the 9 frames.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>1 = [RBU], 0 = [AIS NIS FBE]; RPS0 = 4 (suspended); PRXQ = 1; missed = overflow = 0; DMACMFCR = 0; 9/9 read back identical; afterwards RPS0 = 3.</td></tr>
+<tr><th style="width:150px">Why</th><td>Frame 9 has no room: the DMA suspends, but the MTL FIFO still has space, so it holds the frame and nothing is lost. The first give-back writes the RX tail → the DMA wakes up, and frame 9 goes into rx_desc[0].</td></tr>
+<tr><th style="width:150px">Watch for</th><td>RBU is "abnormal" but not a data error: the driver only needs to supply descriptors + write the tail. AIS is still 0.</td></tr>
+</table></div>
+
+<div class="case" id="cF"><h3>F: RX FIFO overflow: RXOVFIS <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>As in E. RX FIFO 2048 bytes (RQS = 7). RSF = 0.</td></tr>
+<tr><th style="width:150px">Event</th><td>Send 10 frames of 1514 bytes without reading. 8 go into the ring, frame 9 (1518 bytes with FCS) sits in the FIFO, frame 10 has no room left.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>1 = [RBU]; ETH_MTLQICSR.RXOVFIS = 1; MTLRXQMPOCR overflow ≥ 1; 9/10 read back. Also prints MTLISR.Q0IS and DMAISR.MTLIS (not known yet whether they come up with nothing enabled).</td></tr>
+<tr><th style="width:150px">Why</th><td>Overflow is an MTL event, not a DMA event: it lives in MTLQICSR (rc_w1), with the counter in MTLRXQMPOCR (clear on read).</td></tr>
+<tr><th style="width:150px">Watch for</th><td>If a frame arrives with RDES3.OE = 1, the MTL has forwarded a truncated frame (p.3105). After the case: write 1 to RXOVFIS, print again.</td></tr>
+</table></div>
+
+<div class="case" id="cG"><h3>G: Watchdog RX: RWT <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACWTR = PWE | WTO = 0 (2 KB) (p.3120); ETH_MACCR JE = 1, WD = 0 so TX can send 2100 bytes.</td></tr>
+<tr><th style="width:150px">Event</th><td>Send 2100 bytes. The receiver cuts at 2048.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>ingress returns −3 (ES); RDES3 RWT [22] = 1; 1 = [RWT]; ETH_MACRXTXSR.RWT [8] = 1 (read last, read to clear); MACISR.RXSTSIS also printed. Afterwards: write 1 to RWT, then write 0, to find out whether it is rc_w1 or rw.</td></tr>
+<tr><th style="width:150px">Why</th><td>RWT goes through three layers: the descriptor (bad frame), DMACSR bit 9, MAC status. The access column for bit 9 says "rw", unlike every other bit: the code tries both ways of clearing and prints which one works.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>End of case: MACWTR = 0, eth_rx_flush. 0x200 is not in the common clear mask IS_DMACSR_W1C because it is not yet known whether it is rw or rc_w1.</td></tr>
+</table></div>
+
+<div class="case" id="cH1"><h3>H1: Stopping the TX DMA: ST = 0 <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_DMACTXCR.ST [0] (p.3079).</td></tr>
+<tr><th style="width:150px">Event</th><td>ST = 0, wait 200 µs, read; ST = 1 again; send a frame.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>1 = [TPS]; TPS0 = 0 (stopped); the frame sent after restarting comes back SAME.</td></tr>
+<tr><th style="width:150px">Why</th><td>TPS = "Transmit Process Stopped", abnormal group, set when the DMA stops on command. Not an error.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>Stopping/restarting the DMA is what a driver does when it changes configuration (RM §61.9.1). H1 shows that doing so does not lose the ring.</td></tr>
+</table></div>
+
+<div class="case" id="cH2"><h3>H2: Stopping the RX DMA: SR = 0 <span class="tag p">status</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_DMACRXCR.SR [0] (p.3081).</td></tr>
+<tr><th style="width:150px">Event</th><td>SR = 0, wait, read; SR = 1; one frame.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>1 = [RPS]; RPS0 = 0; the frame comes back SAME.</td></tr>
+<tr><th style="width:150px">Why</th><td>RPS is bit 8; like H1 but for the receiver.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>After SR = 1 the DMA continues from the current descriptor; the ring is not scrambled.</td></tr>
+</table></div>
+
+<div class="case drop" id="cI"><h3>I: Bus error: TX buffer in DTCM <span class="tag d">BAD-case</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>Hand-built descriptor: TDES0 = 0x20000000 (DTCM), B1L = FL = 60, OWN | FD | LD; write the TX tail. Last case.</td></tr>
+<tr><th style="width:150px">Event</th><td>The Ethernet DMA cannot reach DTCM (RM §2.1.7 p.113: only the CPU and MDMA) → AHB returns an error.</td></tr>
+<tr><th style="width:150px">Expected (DMACSR and more)</th><td>1 = [FBE TPS], 0 = [AIS NIS]; TEB: bit 0 = 1 (read), bit 1 = 0 (data buffer, not descriptor), bit 2 printed; TPS0 = 0; TDES3 still has OWN = 1 (the DMA does not close it).</td></tr>
+<tr><th style="width:150px">Why</th><td>p.3095: when FBE = 1 the DMA channel shuts off all bus access. Only a software reset (eth_reset_mac in the next test) recovers it. This is the classic STM32H7 mistake: putting Ethernet buffers in DTCM/ITCM.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>If the board does not raise FBE within 10 ms: DTCM may be readable over AHB on this silicon (a surprise, worth recording). The meaning of TEB bit 2 for a buffer error is not clear yet.</td></tr>
+</table></div>
+
+
+<h2 id="lessons">8. Lessons from the board</h2>
+<table>
+<tr><th>Date</th><th>Case</th><th>Observed</th><th>Takeaway</th><th>Code change</th></tr>
+<tr><td>2026-11-07</td><td>mode 4 F</td><td>DMACSR = 0x2C04 (TBU ETI ERI CDE), AIS = 0, DMACIER = 0</td><td>status bits come up without enable; AIS follows p.3094</td><td>mode 12 expects AIS = NIS = 0 in every case</td></tr>
+<tr><td>2026-11-08</td><td>mode 7 (FLOW)</td><td>after one frame: 0x0C04 = TBU ETI ERI, TI = RI = 0</td><td>with IOC = 0 there is no TI / RI; ETI / ERI come up on their own</td><td>case B expects exactly that trio</td></tr>
+<tr><td>waiting for the board</td><td>A..I</td><td></td><td></td><td></td></tr>
+</table>
+
+<p>Questions the log must answer: (1) do DC0IS / MTLIS / MACIS come up with enable = 0? (2) is RWT cleared by writing 1 or by writing 0? (3) FBE with DTCM: TEB = ? (4) Q0IS when RXOVFIS? (5) does RXSTSIS come up because of RWT? (6) does the overflowed frame in F leave RDES3.OE behind?</p>
+
+<h2 id="bits">9. Bit table for lookup</h2>
+<table>
+<tr><th>Register</th><th>Bits used</th><th>In the test</th><th>RM</th></tr>
+<tr><td>ETH_DMACSR</td><td>TI TPS TBU RI RBU RPS RWT ETI ERI FBE CDE AIS NIS TEB REB</td><td>every case</td><td>p.3093-3095</td></tr>
+<tr><td>ETH_DMACIER</td><td>all = 0</td><td>mac_dma_init</td><td>p.3087</td></tr>
+<tr><td>ETH_DMAISR</td><td>DC0IS [0] MTLIS [16] MACIS [17]</td><td>printed in every case</td><td>p.3077</td></tr>
+<tr><td>ETH_DMADSR</td><td>TPS0 [15:12] RPS0 [11:8]: 0 stopped, 3 waiting, 4 RX suspended, 6 TX suspended</td><td>A E H I</td><td>p.3078</td></tr>
+<tr><td>ETH_MTLISR / ETH_MTLQICSR</td><td>Q0IS [0] / RXOVFIS [16] TXUNFIS [0] RXOIE [24] TXUIE [8]</td><td>F</td><td>p.3101, p.3104</td></tr>
+<tr><td>ETH_MTLRXQMPOCR / ETH_MTLRXQDR</td><td>OVFPKTCNT [10:0] MISPKTCNT [26:16] / PRXQ [29:16]</td><td>E F</td><td>p.3108-3109</td></tr>
+<tr><td>ETH_MACISR / ETH_MACRXTXSR</td><td>RXSTSIS [14] TXSTSIS [13] TSIS [12] / RWT [8]</td><td>G</td><td>p.3131, p.3134</td></tr>
+<tr><td>ETH_MACWTR</td><td>PWE [8] WTO [3:0]</td><td>G</td><td>p.3120</td></tr>
+<tr><td>ETH_DMACTXCR / ETH_DMACRXCR</td><td>ST [0] / SR [0]</td><td>H1 H2</td><td>p.3079, p.3081</td></tr>
+<tr><td>TDES2 / RDES3</td><td>IOC [31] / IOC [30]</td><td>C</td><td>p.3050, p.3064</td></tr>
+<tr><td>ETH_DMACMFCR</td><td>MFC [10:0]</td><td>E</td><td>p.3096</td></tr>
+</table>
+
+
+<h2 id="todo">10. Cases worth adding</h2>
+<table>
+<tr><th>Case</th><th>Try</th><th>Expected</th></tr>
+<tr><td>J</td><td>DMACIER.TIE | NIE enabled, NVIC still off, one IOC frame</td><td>TI = 1 <b>and NIS = 1</b>; no ISR. An intermediate step before enabling the real NVIC</td></tr>
+<tr><td>K</td><td>ETH_IRQn enabled + a counting ISR</td><td>the ISR runs exactly once per frame and clears by writing DMACSR back; afterwards the polling modes still work</td></tr>
+<tr><td>L</td><td>RX FBE: RX buffer in DTCM</td><td>FBE with REB instead of TEB; RPS</td></tr>
+<tr><td>M</td><td>ETH_DMACRXCR.RPF = 1 (flush when out of descriptors) + case E</td><td>frame 9 is dropped: DMACMFCR.MFC = 1, MISPKTCNT = 1 instead of waiting</td></tr>
+<tr><td>N</td><td>ETH_MACCSRSWCR.RCWE = 1</td><td>MAC status (MACRXTXSR.RWT) cleared by writing 1 instead of reading</td></tr>
+<tr><td>O</td><td>MTLQICSR.TXUNFIS: TSF = 0, small TTC, slow TX buffer</td><td>hard to force in loopback; may need the bus kept busy with MDMA</td></tr>
+<tr><td>P</td><td>ETH_MACISR.TSIS via the PPS target time (MACPPSTTSR)</td><td>TSIS = 1 when the system time passes the target, MACTSSR.TSTARGT0, cleared by reading MACTSSR</td></tr>
+</table>
+
+</main>
+</body>
+</html>

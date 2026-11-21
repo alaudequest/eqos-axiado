@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SA and CRC at the transmitter: mode 10 case by case</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1d1f;--muted:#5d636b;--line:#cdd0d5;--card:#ffffff;--accent:#0b63c5;--accent-bg:#e2eefb;
+--warn:#a8590a;--warn-bg:#fdf0d0;--ok:#157a3b;--ok-bg:#e0f3e6;--bad:#b3261e;--bad-bg:#fbe4e2;--code:#f0f1f3;--g:#6b3fb3;--g-bg:#efe8fb;--t:#0f766e;--t-bg:#dcf2ef}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:60px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:6px;align-items:center;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:13.5px;flex-wrap:wrap}
+.top .brand{font-weight:700;margin-right:12px;white-space:nowrap}
+.top a{padding:4px 12px;border-radius:99px;text-decoration:none;color:var(--fg);border:1px solid var(--line);white-space:nowrap}
+.top a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 80px;min-width:0}
+h1{font-size:28px;margin:0 0 6px;line-height:1.25}
+h2{font-size:21px;margin:48px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:26px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:15.5px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+.case{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:12px 18px;margin:18px 0}
+.case.drop{border-left-color:var(--bad)}
+.case h3{margin:4px 0 8px}
+.case pre{margin:4px 0;font-size:12.5px;line-height:1.4}
+.case .tag{display:inline-block;font-size:12.5px;padding:1px 9px;border-radius:99px;border:1px solid var(--line);margin-left:8px;vertical-align:middle;font-weight:500}
+.case .tag.p{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.case .tag.d{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.tip{border-left:4px solid var(--ok);background:var(--ok-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.warn{border-left:4px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.mem{border-left:4px solid var(--g);background:var(--g-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:15.5px}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.5;margin:10px 0}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-bg)}
+td.c{text-align:center}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.toc{columns:2;column-gap:28px;font-size:14px}
+.toc a{text-decoration:none}
+svg{width:100%;height:auto;display:block;margin:12px 0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+svg text{fill:var(--fg);font-size:13px}
+svg .m{fill:var(--muted);font-size:12px}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+svg .b{font-weight:700}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .reg{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.4}
+svg .mac{fill:var(--t-bg);stroke:var(--t);stroke-width:1.4}
+svg .okb{fill:var(--ok-bg);stroke:var(--ok);stroke-width:1.4}
+svg .badb{fill:var(--bad-bg);stroke:var(--bad);stroke-width:1.4}
+svg .byt{fill:var(--code);stroke:var(--line);stroke-width:1}
+svg .s{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1}
+svg .cc{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1}
+svg .ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+svg .ln2{stroke:var(--muted);stroke-width:1.1;fill:none;stroke-dasharray:4 3}
+@media (max-width:600px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="top"><span class="brand">MAC loopback</span>
+<a href="MAC_LOOPBACK_filter.html">Table filter (mode 1)</a><a href="MAC_LOOPBACK_burst.html">DMA burst (mode 2)</a><a href="MAC_LOOPBACK_ptp.html">PTP (mode 3)</a><a href="MAC_LOOPBACK_vlan_tag.html">VLAN tag (mode 4, 5)</a><a href="MAC_LOOPBACK_tso.html">TSO (mode 6)</a><a href="MAC_LOOPBACK_coe.html">Checksum (mode 7)</a><a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a><a class="on" href="#">SA / CRC (mode 10)</a><a href="MAC_LOOPBACK_addr_filter.html">Address filter (mode 11)</a><a href="MAC_LOOPBACK_istat.html">Interrupts: status (mode 12)</a></div>
+<main>
+<h1>SA and CRC at the transmitter: mode 10 case by case</h1>
+<p class="lead">Cheat sheet for <code>eth_run_test_ops = 10</code> (<code>eth_mac_sa_cpc_lb</code>, file <code>eth_sa_functions.c</code>). STM32H755, RM0399 Rev 4. Written before running on the board: section 8 gets filled in once there is a log.</p>
+
+<div class="mem"><b>Mnemonic:</b> <i>The transmitter can rewrite the source address by itself (SAIC per frame, SARC for every frame; MACA0 or MACA1) and decide on pad and FCS by itself (CPC). The receiver only sees the consequences: a new SA, a new length, or a bad CRC. Whether a broken frame reaches a descriptor is the MTL's business: FUP for runts, FEP for errors.</i></div>
+
+<div class="card toc">
+<a href="#idea">1. What mode 10 tests</a><br>
+<a href="#sa">2. Replacing / inserting the source address</a><br>
+<a href="#cpc">3. Pad and FCS: CPC, FUP, FEP</a><br>
+<a href="#frames">4. Six test frames</a><br>
+<a href="#sacase">5. How one case runs (sa_case)</a><br>
+<a href="#log">6. Reading the result line</a><br>
+<a href="#cases">7. Twelve cases, one at a time</a><br>
+<a href="#lessons">8. Lessons from the board</a><br>
+<a href="#regs">9. Bit table for lookup</a><br>
+<a href="#todo">10. Cases worth adding</a>
+</div>
+
+<h2 id="idea">1. What mode 10 tests</h2>
+<p>The earlier modes tested the transmitter inserting tags (4, 5), splitting TCP (6) and computing IP checksums (7). Mode 10 tests the two remaining things the transmitter can do to a frame: <b>rewrite the 6 source address bytes</b> and <b>decide on pad + FCS</b>. Both are commanded in TDES3 of the first descriptor (p.3051-3052), and SA also has a global switch, ETH_MACCR.SARC. The frame loops through loopback back to the receiver; the receiver and the MTL RX queue show the result.</p>
+
+<svg viewBox="0 0 960 190" role="img" aria-label="Frame path in mode 10">
+<rect x="10" y="50" width="140" height="70" rx="8" class="box"/><text x="80" y="76" text-anchor="middle" class="b">CPU writes the frame</text><text x="80" y="96" text-anchor="middle" class="m">unknown SA, missing SA,</text><text x="80" y="112" text-anchor="middle" class="m">short, garbage FCS</text>
+<path d="M150 85 H185" class="ln" marker-end="url(#a)"/>
+<rect x="185" y="40" width="210" height="90" rx="8" class="mac"/><text x="290" y="62" text-anchor="middle" class="b">MAC TX modifies the frame</text><text x="290" y="82" text-anchor="middle" class="mono">TDES3.SAIC / MACCR.SARC</text><text x="290" y="100" text-anchor="middle" class="m">SA ← MACA0 / MACA1</text><text x="290" y="118" text-anchor="middle" class="mono">TDES3.CPC: pad, FCS</text>
+<path d="M395 85 H425" class="ln" marker-end="url(#a)"/>
+<rect x="425" y="55" width="80" height="60" rx="8" class="box"/><text x="465" y="89" text-anchor="middle">loopback</text>
+<path d="M505 85 H535" class="ln" marker-end="url(#a)"/>
+<rect x="535" y="40" width="175" height="90" rx="8" class="reg"/><text x="622" y="62" text-anchor="middle" class="b">MAC RX checks the FCS</text><text x="622" y="82" text-anchor="middle" class="m">&lt; 64 byte: runt</text><text x="622" y="100" text-anchor="middle" class="m">bad CRC: CE</text><text x="622" y="118" text-anchor="middle" class="mono">MTLRXQOMR FUP / FEP</text>
+<path d="M710 65 H760" class="ln" marker-end="url(#a)"/>
+<rect x="760" y="30" width="190" height="56" rx="8" class="okb"/><text x="855" y="52" text-anchor="middle" class="b">descriptor</text><text x="855" y="72" text-anchor="middle" class="m">new SA, new length, ES/CE</text>
+<path d="M710 105 H760" class="ln" marker-end="url(#a)"/>
+<rect x="760" y="96" width="190" height="56" rx="8" class="badb"/><text x="855" y="118" text-anchor="middle" class="b">MTL drops</text><text x="855" y="138" text-anchor="middle" class="m">runts if FUP = 0, errors if FEP = 0</text>
+<text x="10" y="175" class="m">MMC ETH_RX_CRC_ERROR_PACKETS counts in the MAC RX, before the MTL: +1 whether or not the bad frame reaches a descriptor.</text>
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+</svg>
+
+<h2 id="sa">2. Replacing / inserting the source address (RM p.2952)</h2>
+<p>Two actions, two address sources, two ways to command it:</p>
+<table>
+<tr><th></th><th>Code [1:0]</th><th>Name in the code</th><th>What the MAC does</th><th>The frame handed in must</th></tr>
+<tr><td rowspan="3">Action</td><td class="c">00</td><td><code>TDES3_SAIC_NONE</code></td><td>not touched</td><td>normal</td></tr>
+<tr><td class="c">01</td><td><code>TDES3_SAIC_INSERT</code></td><td>insert 6 bytes after the DA, the frame grows by 6</td><td><b>have no SA</b> (DA | type | payload)</td></tr>
+<tr><td class="c">10</td><td><code>TDES3_SAIC_REPLACE</code></td><td>overwrite bytes 6..11</td><td><b>have an SA</b> (any value)</td></tr>
+<tr><td rowspan="2">Address</td><td class="c">bit 2 = 0</td><td></td><td>MACA0 (the board's address 00:80:E1:00:00:00)</td><td></td></tr>
+<tr><td class="c">bit 2 = 1</td><td><code>TDES3_SAIC_MACA1</code></td><td>MACA1. RM p.2953 says that with AE = 0 MACA0 is used instead; <b>the board on 2026-11-18 (case E) took MACA1HR/LR as is, even with AE = 0</b></td><td></td></tr>
+<tr><td rowspan="2">Commanded by</td><td colspan="2">TDES3.SAIC [25:23]</td><td>per frame (first descriptor, FD = 1)</td><td>variable <code>eth_tx_saic</code> → <code>egress_packet</code></td></tr>
+<tr><td colspan="2">ETH_MACCR.SARC [30:28]</td><td>every frame</td><td>write the register once</td></tr>
+</table>
+
+<svg viewBox="0 0 960 150" role="img" aria-label="Inserting and replacing the SA">
+<text x="10" y="18" class="b">Replace (B): overwrite in place</text>
+<rect x="10" y="28" width="110" height="26" class="s"/><text x="65" y="46" text-anchor="middle" class="mono">DA</text>
+<rect x="120" y="28" width="150" height="26" class="badb"/><text x="195" y="46" text-anchor="middle" class="mono">02 00 00 00 00 99</text>
+<rect x="270" y="28" width="60" height="26" class="s"/><text x="300" y="46" text-anchor="middle" class="mono">88 B5</text>
+<rect x="330" y="28" width="110" height="26" class="s"/><text x="385" y="46" text-anchor="middle" class="mono">payload</text>
+<path d="M195 54 V66" class="ln" marker-end="url(#a)"/>
+<rect x="120" y="68" width="150" height="26" class="okb"/><text x="195" y="86" text-anchor="middle" class="mono">00 80 E1 00 00 00</text>
+<text x="450" y="46" class="m">60 byte → 60 byte</text>
+<text x="500" y="18" class="b">Insert (C): squeeze in, push the rest back</text>
+<rect x="500" y="28" width="110" height="26" class="s"/><text x="555" y="46" text-anchor="middle" class="mono">DA</text>
+<rect x="610" y="28" width="60" height="26" class="s"/><text x="640" y="46" text-anchor="middle" class="mono">88 B5</text>
+<rect x="670" y="28" width="110" height="26" class="s"/><text x="725" y="46" text-anchor="middle" class="mono">payload</text>
+<rect x="500" y="68" width="110" height="26" class="s"/><text x="555" y="86" text-anchor="middle" class="mono">DA</text>
+<rect x="610" y="68" width="150" height="26" class="okb"/><text x="685" y="86" text-anchor="middle" class="mono">00 80 E1 00 00 00</text>
+<rect x="760" y="68" width="60" height="26" class="s"/><text x="790" y="86" text-anchor="middle" class="mono">88 B5</text>
+<rect x="820" y="68" width="110" height="26" class="s"/><text x="875" y="86" text-anchor="middle" class="mono">payload</text>
+<text x="500" y="120" class="m">54 B → 60 B. An SA frame by mistake: 66 B, the old SA becomes "type".</text>
+<text x="10" y="120" class="m">The MAC does not check: it trusts the software to hand in the right frame format.</text>
+</svg>
+
+<h2 id="cpc">3. Pad and FCS: CPC at the transmitter, FUP / FEP at the receiver</h2>
+<p>Normally (CPC = 00) the transmitter pads short frames up to 60 bytes and appends the 4-byte FCS, so the wire always sees ≥ 64 bytes and a correct CRC. The other three codes switch off parts of that, which produces two kinds of bad frame: <b>runts</b> (shorter than 64 bytes) and <b>bad CRC</b>.</p>
+<table>
+<tr><th>TDES3.CPC [27:26] (p.3051)</th><th>Name in the code</th><th>What the transmitter does</th><th>Used when</th><th>Case</th></tr>
+<tr><td class="c">00</td><td><code>TDES3_CPC_CRC_PAD</code></td><td>pad to 60 + FCS</td><td>default, every other mode</td><td>A..G</td></tr>
+<tr><td class="c">01</td><td><code>TDES3_CPC_CRC_NOPAD</code></td><td>FCS, no pad</td><td>software pads itself; used here to create a runt</td><td>H1a, H1b</td></tr>
+<tr><td class="c">10</td><td><code>TDES3_CPC_NONE</code></td><td>nothing at all</td><td>the buffer already has both pad and FCS (forwarding a whole frame)</td><td>H2a, H2b</td></tr>
+<tr><td class="c">11</td><td><code>TDES3_CPC_CRC_REPLACE</code></td><td>recompute the FCS over the last 4 bytes</td><td>the buffer has room for the FCS but the old value cannot be trusted</td><td>H3</td></tr>
+</table>
+<table>
+<tr><th>ETH_MTLRXQOMR (p.3106)</th><th>Name in the code</th><th>= 0 (default)</th><th>= 1</th></tr>
+<tr><td>FUP [3] Forward Undersized good Packets</td><td><code>MTLRXQOMR_FUP</code></td><td>drop every frame &lt; 64 bytes</td><td>forward error-free runts to the DMA, "including pad and CRC"</td></tr>
+<tr><td>FEP [4] Forward Error Packets</td><td><code>MTLRXQOMR_FEP</code></td><td>drop bad frames (CRC, RE, watchdog, overflow), unless transfer has already started in threshold mode</td><td>forward to the DMA with RDES3.ES = 1 and an error flag (CE for CRC), except bad runts</td></tr>
+</table>
+<div class="warn">RSF = 0 in <code>mac_init_100m</code> (threshold mode, RTC = 64 bytes): the MTL starts forwarding a frame as soon as 64 bytes are in the queue, before it knows whether the frame has an error. The 64-byte frame of H2a sits exactly on that boundary, so "FEP = 0 drops bad frames" may not happen. That is why the code does not grade the descriptor in H2a, only MMC +1. To be sure, enable RSF = 1 (store-and-forward) and run H2a again.</div>
+
+<h2 id="frames">4. Six test frames</h2>
+<p>Built in <code>sa_build_frames()</code>: DA = <code>6C 1F F7 CA 2B FD</code>, EtherType <code>88 B5</code>, payload 0x10, 0x11, ... Unlike mode 8, the SA changes from frame to frame, and there is a frame without an SA, a short frame, and a frame carrying a fake FCS.</p>
+<table>
+<tr><th>Name</th><th>SA</th><th>Length</th><th>Special</th><th>Used in</th></tr>
+<tr><td><code>sa_f_board</code></td><td>00:80:E1:00:00:00 (MACA0)</td><td class="c">60</td><td>the standard frame; also the <b>expected</b> frame of B, C, E, F, H3</td><td>D (sent)</td></tr>
+<tr><td><code>sa_f_other</code></td><td>02:00:00:00:00:99</td><td class="c">60</td><td>unknown SA, to see whether the MAC replaces it</td><td>A, B, E, F, G</td></tr>
+<tr><td><code>sa_f_a1</code></td><td>02:11:22:33:44:55 (= MACA1)</td><td class="c">60</td><td>only an expected frame</td><td>D, G</td></tr>
+<tr><td><code>sa_f_nosa</code></td><td>not present</td><td class="c">54</td><td>DA | type | payload</td><td>C</td></tr>
+<tr><td><code>sa_f_runt</code></td><td>MACA0</td><td class="c">22</td><td>8 byte payload</td><td>H1a, H1b</td></tr>
+<tr><td><code>sa_f_crc</code></td><td>MACA0</td><td class="c">64</td><td>sa_f_board + <code>DE AD BE EF</code> posing as the FCS</td><td>H2a, H2b, H3</td></tr>
+</table>
+<pre>sa_f_other: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 00 00 00 00 99
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre><pre>sa_f_nosa: 54 bytes
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : (none: the CPU hands in a frame without a source address)
+  [ 6.. 7] type   : 88 B5
+  [ 8..53] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 bytes)</pre><pre>sa_f_runt: 22 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..21] payload: 10 11 12 13 14 15 16 17   (8 byte)</pre><pre>sa_f_crc: 64 bytes
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 bytes)
+  [60..63] fake FCS: DE AD BE EF</pre>
+
+<h2 id="sacase">5. How one case runs (sa_case)</h2>
+<table>
+<tr><th>Step</th><th>What it does</th><th>Register / variable</th></tr>
+<tr><td>0</td><td>Print the description, the <code>setup</code> line (SAIC, CPC, SARC, MACA1, FUP, FEP) and <code>Expect</code></td><td></td></tr>
+<tr><td>1</td><td>Write the transmitter and receiver rules</td><td>MACCR.SARC (read-modify-write [30:28]), MACA1HR/LR (AE = 1 or reset values), MTLRXQOMR FUP/FEP (read-modify-write); read MMC CRC err and unicast good</td></tr>
+<tr><td>2</td><td>Send the frame, with SAIC and CPC put into TDES3 of this frame only, then set back to 0</td><td><code>eth_tx_saic</code>, <code>eth_tx_cpc</code> → <code>egress_packet</code></td></tr>
+<tr><td>3</td><td>Receive: 10 ms timeout when a frame is expected, 5 ms when DROP is expected</td><td><code>ingress_packet_status</code>: ≥ 0 good frame, −1 timeout, −3 error descriptor (ES = 1, buffer not copied)</td></tr>
+<tr><td>4</td><td>Grade according to <code>expect</code>: GOOD compares every byte with the expected frame (G accepts the second SA, H1b accepts +4 bytes); DROP nothing came back; ERR must have ES and CE; any only requires that no good frame arrived. On top of that, MMC CRC err must go up by exactly the right amount</td><td>RDES3 ES [15], CE [24]</td></tr>
+<tr><td>5</td><td>One result line</td><td>section 6</td></tr>
+<tr><td>6</td><td>Dump the sent frame (marked "no SA" for C) and the received frame, if any</td><td></td></tr>
+</table>
+
+<h2 id="log">6. Reading the result line</h2>
+<pre>  id   expect actual  len  SA (bytes 6..11)   bytes 12..15   ES CE  MMC crc | result
+  B    GOOD   GOOD     60  00 80 E1 00 00 00  88 B5 10 11    0  0   +0     | OK
+  H1a  DROP   DROP      -  (no frame)                            -  -   +0     | OK
+  H2b  ERR    ERR       -  (error frame, not copied)             1  1   +1     | OK
+  G    GOOD   GOOD     60  02 11 22 33 44 55  88 B5 10 11    0  0   +0     | OK  (descriptor SAIC won over the register)</pre>
+<table>
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td>expect / actual</td><td>GOOD good frame, ERR descriptor with ES = 1, DROP nothing came back, any (H2a) descriptor not graded</td></tr>
+<tr><td>len</td><td>RDES3.PL, FCS already stripped (CST = 1)</td></tr>
+<tr><td>SA</td><td>bytes 6..11 of the received frame: the most important column for A..G</td></tr>
+<tr><td>bytes 12..15</td><td>must be <code>88 B5 10 11</code> in every good frame: type and payload not shifted</td></tr>
+<tr><td>ES CE</td><td>RDES3 [15] and [24]; 1 1 only in H2b</td></tr>
+<tr><td>MMC crc</td><td>difference in ETH_RX_CRC_ERROR_PACKETS; +1 in H2a, H2b; +0 in the other cases, H3 included</td></tr>
+</table>
+<p>When BAD, the code also prints the RDES3 and RDES2 lines, MMC unicast good and the actual crc. As in mode 8/9: BAD may mean the expectation is wrong, especially in E, G, H1b, H2a.</p>
+
+<h2 id="cases">7. Twelve cases, one at a time</h2>
+<p>Every case: CPC = 00 in A..G, SAIC = none in H. "Received frame (expected)" is the prediction made before running on the board.</p>
+<div class="case" id="cA"><h3>A: SAIC = none, unknown SA <span class="tag p">unchanged</span></h3>
+<table><tr><th style="width:130px">TX</th><td>TDES3.SAIC = 000, CPC = 00, MACCR.SARC = 000, MACA1 off</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_other): 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 00 00 00 00 99
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td><pre>frame received: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 00 00 00 00 99
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre>Identical to the sent frame.</td></tr>
+<tr><th>Why</th><td>Nobody told the MAC to touch the SA. The transmitting MAC does not check whether the SA is its own address: it just copies. This is the control for B..G.</td></tr>
+<tr><th>Watch for</th><td>MACPFR.PR = 1 (promiscuous) from <code>mac_init_100m</code>, so the receive-side DA/SA filter does not interfere with this test.</td></tr>
+</table></div>
+
+<div class="case" id="cB"><h3>B: SAIC = replace MACA0 <span class="tag p">SA = board</span></h3>
+<table><tr><th style="width:130px">TX</th><td>TDES3.SAIC = 010 (replace, bit 25 = 0 → MACA0), CPC = 00</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_other): 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 00 00 00 00 99
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td><pre>frame received: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre>Bytes 6..11 change from <code>02 00 00 00 00 99</code> to <code>00 80 E1 00 00 00</code>, the length is unchanged, type and payload stay the same.</td></tr>
+<tr><th>Why</th><td>"Replace" = the MAC overwrites the 6 bytes right after the DA with MACA0 (RM p.2952: "replaces the six bytes following the Destination Address"). The frame must already have an SA, otherwise the type would be eaten.</td></tr>
+<tr><th>Watch for</th><td>This case prints the FLOW [10] line: the decoded TDES3 shows <code>SAIC=2</code>. This is how real drivers often use it: the stack fills in a placeholder SA and the MAC replaces it with the real address.</td></tr>
+</table></div>
+
+<div class="case" id="cC"><h3>C: SAIC = insert MACA0, frame without SA <span class="tag p">54 → 60 bytes</span></h3>
+<table><tr><th style="width:130px">TX</th><td>TDES3.SAIC = 001 (insert MACA0), CPC = 00, FL = 54</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_nosa): 54 bytes
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : (none: the CPU hands in a frame without a source address)
+  [ 6.. 7] type   : 88 B5
+  [ 8..53] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 bytes)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td><pre>frame received: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre>6 bytes of MACA0 are added at byte 6; the type <code>88 B5</code> moves from byte 6 down to byte 12, and the payload moves down by 6.</td></tr>
+<tr><th>Why</th><td>"Insert" = the MAC squeezes 6 bytes in after the DA, and the frame grows by 6. The RM warns: when inserting, the frame handed in must <b>not</b> have an SA; the MAC does not check, it just inserts (p.2952).</td></tr>
+<tr><th>Watch for</th><td>If a frame with an SA is handed in by mistake with SAIC = insert, the frame comes back as 66 bytes and the old SA is pushed into the "type". This reverse experiment is not in the code; it is easy to add as case C2.</td></tr>
+</table></div>
+
+<div class="case" id="cD"><h3>D: SAIC = replace MACA1, MACA1 enabled <span class="tag p">SA = MACA1</span></h3>
+<table><tr><th style="width:130px">TX</th><td>TDES3.SAIC = 110 (bit 25 = 1 → MACA1, replace), MACA1HR.AE = 1, MACA1 = 02:11:22:33:44:55</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_board): 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td><pre>frame received: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 11 22 33 44 55
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Why</th><td>Bit 25 selects the MACA1 register instead of MACA0. MACA1 must be enabled (AE = 1) to be used.</td></tr>
+<tr><th>Watch for</th><td>An enabled MACA1 is also a DA filter entry (mode 1 B4), harmless here because PR = 1. Writing MACA1HR before or after MACA1LR both work, but AE lives in HR so mode 1 writes HR last; writing HR first here is fine too, because the frame is only sent after both writes.</td></tr>
+</table></div>
+
+<div class="case" id="cE"><h3>E: SAIC = replace MACA1, MACA1 disabled <span class="tag d">SA = FF:FF:FF:FF:FF:FF</span> <span class="tag p">board 11-18</span></h3>
+<table><tr><th style="width:130px">TX</th><td>TDES3.SAIC = 110 as in D, but MACA1HR = 0x0000FFFF (AE = 0), MACA1LR = 0xFFFFFFFF (reset values)</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_other): 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 00 00 00 00 99
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Received frame (board)</th><td><pre>frame received: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : FF FF FF FF FF FF
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre>SA = the content of the MACA1 register at reset, <b>not</b> MACA0 as the RM says, and not the original 02:00:..:99 either.</td></tr>
+<tr><th>What the RM says</th><td>p.2953: "If MAC Address1 registers are not enabled, the MAC Address0 registers are used for insertion or replacement whatever of the value of the most-significant bit of the SA Insertion Control field". The first version of the code expected SA = MACA0 based on this sentence and got BAD.</td></tr>
+<tr><th>What the board says</th><td>2026-11-18: SA = FF FF FF FF FF FF. The transmitter only reads MACA1HR[15:0] + MACA1LR and does not look at the AE bit. AE only matters to the address filter on RX. The code has changed its expectation to the frame <code>sa_f_a1reset</code>.</td></tr>
+<tr><th>Takeaway for the driver</th><td>Before using SAIC bit 25 or SARC = 11x, <b>MACA1HR/LR must be loaded with a real address</b>. There is no "safe default": forgetting to load it means sending frames with SA = broadcast, and the switch on the other side will drop them or learn its MAC table wrong.</td></tr>
+</table></div>
+
+<div class="case" id="cF"><h3>F: SAIC = none, MACCR.SARC = replace MACA0 <span class="tag p">SA = board</span></h3>
+<table><tr><th style="width:130px">TX</th><td>TDES3.SAIC = 000; ETH_MACCR.SARC [30:28] = 011 (replace with MACA0 for every frame)</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_other): 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 00 00 00 00 99
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td><pre>frame received: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Why</th><td>SARC is the global way to enable it: no need to touch the descriptor; every frame that passes through the transmitter gets its SA replaced. The SARC code mirrors SAIC: [29:28] the action, bit 30 selects MACA1.</td></tr>
+<tr><th>Watch for</th><td>The FLOW line that decodes MACCR now also shows <code>SARC=3</code>. At the end of the test SARC is set back to 0 so the other modes do not get their SA replaced.</td></tr>
+</table></div>
+
+<div class="case" id="cG"><h3>G: SARC MACA0 and SAIC MACA1 at the same time <span class="tag p">exploratory</span></h3>
+<table><tr><th style="width:130px">TX</th><td>ETH_MACCR.SARC = 011 (replace with MACA0) and TDES3.SAIC = 110 (replace with MACA1, MACA1 enabled)</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_other): 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 02 00 00 00 00 99
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td>One of two: SA = <code>02 11 22 33 44 55</code> (the descriptor wins) or <code>00 80 E1 00 00 00</code> (the register wins). The code accepts both and prints the winner on the result line.</td></tr>
+<tr><th>Why</th><td>The RM does not say how these two command sources are prioritised. In Synopsys EQoS the descriptor (per-packet) usually overrides the global configuration, like VTIR versus MACVIR in mode 4, but it has to be measured.</td></tr>
+<tr><th>What the board says</th><td>2026-11-18: SA = 00 80 E1 00 00 00, <b>the SARC register wins</b>; the log prints "(register SARC won over the descriptor)". Unlike VLAN (mode 4: VTIR in the descriptor overrides MACVIR). Policy for the driver: when SARC is non-zero, the SAIC field in the descriptor is meaningless; to choose the address per frame, SARC must be 0.</td></tr>
+</table></div>
+
+<div class="case drop" id="cH1a"><h3>H1a: CPC = 01 (FCS, no pad), 22 bytes, FUP = 0 <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:130px">TX / RX</th><td>TDES3.CPC = 01, FL = 22; ETH_MTLRXQOMR.FUP = 0</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_runt): 22 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..21] payload: 10 11 12 13 14 15 16 17   (8 byte)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td>No descriptor within 5000 µs. On the wire the frame is 22 + 4 FCS = 26 bytes, below the 64-byte minimum: a <b>runt</b>.</td></tr>
+<tr><th>Why</th><td>CPC = 01 turns off padding, so the transmitting MAC does not pad the frame up to 60 bytes. The receiving MAC gets a frame with a correct FCS but too short; the MTL RX queue with FUP = 0 "drops all packets of less than 64 bytes" (p.3106).</td></tr>
+<tr><th>Watch for</th><td>With CPC = 00 (default) the same 22-byte frame comes back as 60 bytes, as mode 1 saw. Whether MMC ETH_RX_UNICAST_PACKETS_GOOD goes +1 is worth watching: does the MMC count a good runt? <b>Board 2026-11-18: yes.</b> At the end of the test the MMC reports 10 unicast good while only 9 frames reached a descriptor: the 10th frame is this runt. The MMC counts in the MAC RX, before the MTL drops it.</td></tr>
+</table></div>
+
+<div class="case" id="cH1b"><h3>H1b: same runt, FUP = 1 <span class="tag p">22 bytes (board)</span></h3>
+<table><tr><th style="width:130px">TX / RX</th><td>TDES3.CPC = 01, FL = 22; ETH_MTLRXQOMR.FUP = 1</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_runt): 22 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..21] payload: 10 11 12 13 14 15 16 17   (8 byte)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td><pre>frame received: 22 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..21] payload: 10 11 12 13 14 15 16 17   (8 byte)</pre>Or 26 bytes: RM p.3106 says FUP forwards runts "including pad-bytes and CRC", so maybe the FCS is not stripped by CST. The code accepts 22 or 26, and the first 22 bytes must match.</td></tr>
+<tr><th>Why</th><td>FUP = Forward Undersized good Packets: lets error-free runts through.</td></tr>
+<tr><th>What the board says</th><td>2026-11-18: 22 bytes, identical to the sent frame. CST strips the runt's FCS like any other frame; the phrase "including pad-bytes and CRC" on p.3106 only refers to the 64-byte threshold used to classify runts, not to the data handed up.</td></tr>
+</table></div>
+
+<div class="case drop" id="cH2a"><h3>H2a: CPC = 10 (no FCS), garbage FCS, FEP = 0 <span class="tag d">CRC err +1</span></h3>
+<table><tr><th style="width:130px">TX / RX</th><td>TDES3.CPC = 10, FL = 64 (60 + 4 byte DE AD BE EF); ETH_MTLRXQOMR.FEP = 0</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_crc): 64 bytes
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 bytes)
+  [60..63] fake FCS: DE AD BE EF   (set by the CPU, wrong)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td>No good frame. MMC ETH_RX_CRC_ERROR_PACKETS +1. Whether there is an error descriptor (ES = 1) depends on the MTL: with FEP = 0 the bad frame is dropped, unless the "start pointer already transferred" in threshold mode (RSF = 0, RTC = 64 bytes, frame exactly 64 bytes: on the boundary). The code only grades MMC +1 and the absence of a good frame. <b>Board 2026-11-18: no descriptor at all</b> (DROP), MMC crc +1. With RSF = 0 and a 64-byte frame the MTL can still drop the whole bad frame.</td></tr>
+<tr><th>Why</th><td>CPC = 10: the transmitting MAC does not compute the FCS and sends the 64 bytes as is. The receiving MAC computes the CRC over the first 60 bytes and compares it with DE AD BE EF: mismatch → CE.</td></tr>
+<tr><th>Watch for</th><td>64 bytes are used rather than 60 so the frame is not a runt at the same time (FEP does not forward bad runts either). The MMC crc column on the result line is the main evidence.</td></tr>
+</table></div>
+
+<div class="case drop" id="cH2b"><h3>H2b: same frame, FEP = 1 <span class="tag d">ES = 1, CE = 1</span></h3>
+<table><tr><th style="width:130px">TX / RX</th><td>TDES3.CPC = 10; ETH_MTLRXQOMR.FEP = 1</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_crc): 64 bytes
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 bytes)
+  [60..63] fake FCS: DE AD BE EF</pre></td></tr>
+<tr><th>Received frame (expected)</th><td>The descriptor has RDES3.ES = 1 and CE = 1 (p.3069). <code>ingress_packet_status</code> returns −3 and does not copy the buffer, so the len column prints <code>-</code> and the ES CE columns print 1 1. MMC crc +1.</td></tr>
+<tr><th>Why</th><td>FEP = Forward Error Packets: the MTL forwards bad frames to the DMA with error flags so software can decide.</td></tr>
+<tr><th>Watch for</th><td>This is the first time in the test suite that a real RDES3.ES = 1 is seen. To look at the data of a bad frame, ingress would have to be changed to copy the buffer even when ES = 1.</td></tr>
+</table></div>
+
+<div class="case" id="cH3"><h3>H3: CPC = 11 (replace FCS), same frame <span class="tag p">60 good bytes</span></h3>
+<table><tr><th style="width:130px">TX / RX</th><td>TDES3.CPC = 11, FL = 64; FEP = 0</td></tr>
+<tr><th>Frame sent</th><td><pre>frame sent (sa_f_crc): 64 bytes
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 bytes)
+  [60..63] fake FCS: DE AD BE EF   (the MAC will recompute and overwrite it)</pre></td></tr>
+<tr><th>Received frame (expected)</th><td><pre>frame received: 60 byte
+  [ 0.. 5] DA     : 6C 1F F7 CA 2B FD
+  [ 6..11] SA     : 00 80 E1 00 00 00
+  [12..13] type   : 88 B5
+  [14..59] payload: 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+                    20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+                    30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D   (46 byte)</pre>60 bytes: the correct FCS has been stripped by CST, MMC crc +0.</td></tr>
+<tr><th>Why</th><td>CPC = 11: the MAC computes the CRC over the first 60 bytes and overwrites the last 4 bytes of the buffer. Used when software has already left room for the FCS (e.g. forwarding a frame from another port).</td></tr>
+<tr><th>Watch for</th><td>H2a/H2b/H3 send the same frame and differ only in two CPC bits: the cleanest control set in mode 10.</td></tr>
+</table></div>
+
+<h2 id="lessons">8. Lessons from the board</h2>
+<p>First run 2026-11-18: <b>11/12</b>, only E BAD. All 5 open questions now have answers. Log: <code>CM7/Core/Src/log/COM3_2026_11_18.15.35.18.302.txt</code>.</p>
+<table>
+<tr><th>Date</th><th>Case</th><th>Observed</th><th>Takeaway</th><th>Code change</th></tr>
+<tr><td>2026-11-18</td><td>E</td><td>SAIC = replace MACA1, AE = 0 → SA = <code>FF FF FF FF FF FF</code>, not MACA0</td><td>The transmitter reads MACA1HR/LR as is, without looking at AE. RM p.2953 is wrong for this silicon. AE is only for the RX filter.</td><td>The expectation for E changed to <code>sa_f_a1reset</code> (SA = FF×6). Note at the top of the file.</td></tr>
+<tr><td>2026-11-18</td><td>G</td><td>SARC = replace MACA0 + SAIC = replace MACA1 → SA = MACA0</td><td><b>The register beats the descriptor.</b> The opposite of VLAN (VTIR beats MACVIR). With SARC ≠ 0, SAIC is meaningless.</td><td>No change (both were already accepted), just a note.</td></tr>
+<tr><td>2026-11-18</td><td>H1b</td><td>A 22-byte runt with FUP = 1 reaches the descriptor as exactly 22 bytes</td><td>The runt's FCS is also stripped by CST. No 26 bytes.</td><td>No change; <code>allow_fcs</code> is kept just in case of other silicon.</td></tr>
+<tr><td>2026-11-18</td><td>H2a</td><td>Bad FCS, FEP = 0 → no descriptor, MMC crc +1</td><td>The MTL drops the whole bad frame even with RSF = 0 (threshold mode). The warning "once transfer has started it cannot be dropped" does not apply to a 64-byte frame.</td><td>No change (SA_RX_ANY), just a note.</td></tr>
+<tr><td>2026-11-18</td><td>H1a</td><td>The runt is dropped by the MTL but MMC unicast good still goes +1 (10 versus 9 frames received)</td><td>The MMC counts in the MAC RX, before the MTL. The MMC "good" count does not equal the number of frames software receives.</td><td>No change, note only.</td></tr>
+<tr><td>2026-11-18</td><td>log</td><td>The setup line printed "SARC = 3 (reserved)"</td><td>SARC is encoded differently from SAIC: [29:28] 10 insert / 11 replace, whereas SAIC [24:23] is 01 insert / 10 replace. One shared naming function is wrong.</td><td>Split into <code>sa_saic_name</code> / <code>sa_sarc_name</code>.</td></tr>
+</table>
+<p>Expected result after the fixes: 12/12. The two most important lessons for the driver: <b>load MACA1 before selecting it</b> (E), and <b>SARC is a global switch that overrides the descriptor</b> (G).</p>
+
+<h2 id="regs">9. Bit table for lookup</h2>
+<table>
+<tr><th>Register / descriptor</th><th>Bit</th><th>Used in</th><th>RM0399</th></tr>
+<tr><td>TDES3 (read format)</td><td>SAIC [25:23]: [24:23] 00 none / 01 insert / 10 replace, [25] MACA1</td><td>B..E, G</td><td>p.3052</td></tr>
+<tr><td>TDES3 (read format)</td><td>CPC [27:26]: 00 pad+FCS / 01 FCS / 10 none / 11 replace FCS</td><td>H</td><td>p.3051</td></tr>
+<tr><td>ETH_MACCR</td><td>SARC [30:28]: same code, [30] MACA1; every frame</td><td>F, G</td><td>p.3113</td></tr>
+<tr><td>ETH_MACA1HR / LR</td><td>AE [31], ADDRHI [15:0] = byte 5:4; ADDRLO [31:0] = byte 3:0</td><td>D, E, G</td><td>p.3154-3155</td></tr>
+<tr><td>ETH_MTLRXQOMR</td><td>FUP [3], FEP [4], RSF [5], RTC [1:0]</td><td>H</td><td>p.3106</td></tr>
+<tr><td>RDES3 (write-back)</td><td>ES [15], CE [24], PL [14:0]</td><td>H2b</td><td>p.3069</td></tr>
+<tr><td>MMC</td><td>ETH_RX_CRC_ERROR_PACKETS, ETH_RX_UNICAST_PACKETS_GOOD</td><td>H</td><td>p.3163-3164</td></tr>
+<tr><td>Feature</td><td>Source address insertion or replacement</td><td></td><td>p.2952</td></tr>
+</table>
+
+<h2 id="todo">10. Cases worth adding</h2>
+<table>
+<tr><th>Case</th><th>Try</th><th>Expected</th></tr>
+<tr><td>C2</td><td>SAIC = insert with a frame that <b>has</b> an SA (60 bytes)</td><td>66 bytes, bytes 12..17 = the old SA, type at byte 18: illustrates "the MAC does not check"</td></tr>
+<tr><td>F2</td><td>SARC = insert MACA0 (010) with sa_f_nosa</td><td>60 bytes like C, but via the register</td></tr>
+<tr><td>H2c</td><td>H2a with MTLRXQOMR.RSF = 1</td><td>definitely no descriptor (store-and-forward knows about the error before forwarding)</td></tr>
+<tr><td>H1c</td><td>a 22-byte runt with CPC = 10 (no FCS) and FUP = 1</td><td>a <b>bad</b> runt: neither FEP nor FUP forwards it (p.3106), MMC crc +1?</td></tr>
+<tr><td>H4</td><td>CPC = 01 with a 60-byte frame</td><td>normal: no pad, and no pad needed</td></tr>
+</table>
+</main>
+</body>
+</html>

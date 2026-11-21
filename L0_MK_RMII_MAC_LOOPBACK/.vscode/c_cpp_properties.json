@@ -1,0 +1,61 @@
+﻿{
+    "version":  4,
+    "configurations":  [
+                           {
+                               "compilerArgs":  [
+                                                    "-mcpu=cortex-m7",
+                                                    "-mthumb",
+                                                    "-mfpu=fpv5-d16",
+                                                    "-mfloat-abi=hard"
+                                                ],
+                               "includePath":  [
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\CM7\\Core\\Inc",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\BSP\\STM32H7xx_Nucleo",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Include"
+                                               ],
+                               "name":  "CM7",
+                               "intelliSenseMode":  "gcc-arm",
+                               "cppStandard":  "gnu++14",
+                               "defines":  [
+                                               "DEBUG",
+                                               "CORE_CM7",
+                                               "USE_HAL_DRIVER",
+                                               "STM32H755xx",
+                                               "USE_PWR_DIRECT_SMPS_SUPPLY",
+                                               "USE_NUCLEO_64"
+                                           ],
+                               "cStandard":  "gnu11",
+                               "compilerPath":  "D:\\Stm32IDE\\STM32CubeIDE_1.19.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.13.3.rel1.win32_1.0.0.202411081344\\tools\\bin\\arm-none-eabi-gcc.exe"
+                           },
+                           {
+                               "compilerArgs":  [
+                                                    "-mcpu=cortex-m4",
+                                                    "-mthumb",
+                                                    "-mfpu=fpv4-sp-d16",
+                                                    "-mfloat-abi=hard"
+                                                ],
+                               "includePath":  [
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\CM4\\Core\\Inc",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
+                                                   "D:\\STM_Work_Space\\eqos-axiado\\eth_4\\Drivers\\CMSIS\\Include"
+                                               ],
+                               "name":  "CM4",
+                               "intelliSenseMode":  "gcc-arm",
+                               "cppStandard":  "gnu++14",
+                               "defines":  [
+                                               "DEBUG",
+                                               "CORE_CM4",
+                                               "USE_HAL_DRIVER",
+                                               "STM32H755xx",
+                                               "USE_PWR_DIRECT_SMPS_SUPPLY"
+                                           ],
+                               "cStandard":  "gnu11",
+                               "compilerPath":  "D:\\Stm32IDE\\STM32CubeIDE_1.19.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.13.3.rel1.win32_1.0.0.202411081344\\tools\\bin\\arm-none-eabi-gcc.exe"
+                           }
+                       ]
+}

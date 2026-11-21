@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VLAN tag: who inserts it, what value, from where</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1d1f;--muted:#5d636b;--line:#cdd0d5;--card:#ffffff;--accent:#0b63c5;--accent-bg:#e2eefb;
+--warn:#a8590a;--warn-bg:#fdf0d0;--ok:#157a3b;--ok-bg:#e0f3e6;--bad:#b3261e;--bad-bg:#fbe4e2;--code:#f0f1f3;--g:#6b3fb3;--g-bg:#efe8fb;--t:#0f766e;--t-bg:#dcf2ef}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:60px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:6px;align-items:center;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:13.5px;flex-wrap:wrap}
+.top .brand{font-weight:700;margin-right:12px;white-space:nowrap}
+.top a{padding:4px 12px;border-radius:99px;text-decoration:none;color:var(--fg);border:1px solid var(--line);white-space:nowrap}
+.top a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 80px;min-width:0}
+h1{font-size:28px;margin:0 0 6px;line-height:1.25}
+h2{font-size:21px;margin:48px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:26px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:15.5px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+.tip{border-left:4px solid var(--ok);background:var(--ok-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.warn{border-left:4px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.mem{border-left:4px solid var(--g);background:var(--g-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:15.5px}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.5;margin:10px 0}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-bg)}
+td.c{text-align:center}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+svg{width:100%;height:auto;display:block;margin:12px 0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+svg text{fill:var(--fg);font-size:13px}
+svg .m{fill:var(--muted);font-size:12px}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+svg .b{font-weight:700}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .ctx{fill:var(--g-bg);stroke:var(--g);stroke-width:1.4}
+svg .nrm{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1.4}
+svg .reg{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.4}
+svg .mac{fill:var(--t-bg);stroke:var(--t);stroke-width:1.4}
+svg .byt{fill:var(--code);stroke:var(--line);stroke-width:1}
+svg .s{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1}
+svg .cc{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1}
+svg .ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+svg .ln2{stroke:var(--muted);stroke-width:1.1;fill:none;stroke-dasharray:4 3}
+svg .sw{stroke:var(--bad);stroke-width:2;fill:none}
+.legend span{display:inline-block;padding:2px 10px;border-radius:6px;margin:2px 6px 2px 0;font-size:13px;border:1px solid}
+.l-ctx{background:var(--g-bg);border-color:var(--g)}.l-nrm{background:var(--accent-bg);border-color:var(--accent)}.l-reg{background:var(--warn-bg);border-color:var(--warn)}.l-mac{background:var(--t-bg);border-color:var(--t)}
+</style>
+</head>
+<body>
+<div class="top"><span class="brand">MAC loopback</span>
+<a href="MAC_LOOPBACK_filter.html">Table filter (mode 1)</a><a href="MAC_LOOPBACK_burst.html">DMA burst (mode 2)</a><a href="MAC_LOOPBACK_ptp.html">PTP (mode 3)</a><a class="on" href="#">VLAN tag (mode 4, 5)</a><a href="MAC_LOOPBACK_tso.html">TSO (mode 6)</a><a href="MAC_LOOPBACK_coe.html">Checksum (mode 7)</a><a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a><a href="MAC_LOOPBACK_sa_cpc.html">SA / CRC (mode 10)</a><a href="MAC_LOOPBACK_addr_filter.html">Address filter (mode 11)</a><a href="MAC_LOOPBACK_istat.html">Interrupts: status (mode 12)</a></div>
+<main>
+<h1>VLAN tag: who inserts it, what value, from where</h1>
+<p class="lead">Cheat sheet for mode 4 (one tag) and mode 5 (QinQ, two tags) of the MAC loopback test. STM32H755, RM0399 Rev 4.</p>
+
+<div class="mem"><b>Mnemonic:</b> <i>Value in the context. Outer command in the frame. Inner command in the context. VLP = 1 and the register takes over.</i></div>
+
+<p class="legend"><span class="l-ctx">context descriptor</span><span class="l-nrm">normal descriptor (frame)</span><span class="l-reg">MAC register</span><span class="l-mac">done by MAC</span></p>
+
+<h2 id="frame">1. The frame before and after the MAC inserts the tag</h2>
+<p>The CPU only writes a bare frame. For each tag the MAC inserts 4 extra bytes right after the SA, pushing the EtherType and the payload back by 4 bytes.</p>
+<svg viewBox="0 0 960 250" role="img" aria-label="Frame 60, 64, 68 byte">
+  <text x="8" y="24" class="b">CPU sends (60 B)</text>
+  <rect x="150" y="8" width="90" height="26" class="byt"/><text x="195" y="26" text-anchor="middle" class="mono">DA 6 B</text>
+  <rect x="240" y="8" width="90" height="26" class="byt"/><text x="285" y="26" text-anchor="middle" class="mono">SA 6 B</text>
+  <rect x="330" y="8" width="70" height="26" class="byt"/><text x="365" y="26" text-anchor="middle" class="mono">88 B5</text>
+  <rect x="400" y="8" width="200" height="26" class="byt"/><text x="500" y="26" text-anchor="middle" class="mono">payload 46 B</text>
+  <text x="150" y="52" class="m mono">0</text><text x="240" y="52" class="m mono">6</text><text x="330" y="52" class="m mono">12</text><text x="400" y="52" class="m mono">14</text>
+
+  <text x="8" y="100" class="b">One tag (64 B)</text>
+  <rect x="150" y="84" width="90" height="26" class="byt"/><text x="195" y="102" text-anchor="middle" class="mono">DA</text>
+  <rect x="240" y="84" width="90" height="26" class="byt"/><text x="285" y="102" text-anchor="middle" class="mono">SA</text>
+  <rect x="330" y="84" width="110" height="26" class="cc"/><text x="385" y="102" text-anchor="middle" class="mono">81 00 00 64</text>
+  <rect x="440" y="84" width="70" height="26" class="byt"/><text x="475" y="102" text-anchor="middle" class="mono">88 B5</text>
+  <rect x="510" y="84" width="200" height="26" class="byt"/><text x="610" y="102" text-anchor="middle" class="mono">payload</text>
+  <text x="330" y="128" class="m mono">12</text><text x="440" y="128" class="m mono">16</text><text x="510" y="128" class="m mono">18</text>
+  <text x="730" y="102" class="m">mode 4 case B, C, E · RDES3.LT = 4</text>
+
+  <text x="8" y="176" class="b">Two QinQ tags (68 B)</text>
+  <rect x="150" y="160" width="90" height="26" class="byt"/><text x="195" y="178" text-anchor="middle" class="mono">DA</text>
+  <rect x="240" y="160" width="90" height="26" class="byt"/><text x="285" y="178" text-anchor="middle" class="mono">SA</text>
+  <rect x="330" y="160" width="110" height="26" class="s"/><text x="385" y="178" text-anchor="middle" class="mono">88 A8 07 D0</text>
+  <rect x="440" y="160" width="110" height="26" class="cc"/><text x="495" y="178" text-anchor="middle" class="mono">81 00 00 64</text>
+  <rect x="550" y="160" width="70" height="26" class="byt"/><text x="585" y="178" text-anchor="middle" class="mono">88 B5</text>
+  <rect x="620" y="160" width="160" height="26" class="byt"/><text x="700" y="178" text-anchor="middle" class="mono">payload</text>
+  <text x="330" y="204" class="m mono">12</text><text x="440" y="204" class="m mono">16</text><text x="550" y="204" class="m mono">20</text><text x="620" y="204" class="m mono">22</text>
+  <text x="330" y="232" class="m">OUTER tag (S-tag, service provider)</text><text x="520" y="232" class="m">INNER tag (C-tag, customer)</text>
+  <text x="800" y="178" class="m">mode 5 · LT = 5</text>
+</svg>
+
+<h3>One tag = 4 bytes = type + value</h3>
+<svg viewBox="0 0 960 175" role="img" aria-label="TPID and TCI">
+  <rect x="20" y="20" width="200" height="34" class="s"/><text x="120" y="42" text-anchor="middle" class="mono b">88 A8</text>
+  <rect x="220" y="20" width="200" height="34" class="s"/><text x="320" y="42" text-anchor="middle" class="mono b">07 D0</text>
+  <text x="120" y="76" text-anchor="middle" class="m">TPID: tag type</text>
+  <text x="320" y="76" text-anchor="middle" class="m">TCI: tag value</text>
+  <text x="20" y="104" class="m">0x8100 = C-tag (802.1Q, customer)</text>
+  <text x="20" y="124" class="m">0x88A8 = S-tag (802.1ad, service provider)</text>
+  <text x="20" y="156" class="m">Selected by CSVL: MACVIR.CSVL for the outer tag, MACIVIR.CSVL for the inner tag</text>
+
+  <rect x="500" y="20" width="130" height="34" class="byt"/><text x="565" y="42" text-anchor="middle" class="mono">PCP 3 bits</text>
+  <rect x="630" y="20" width="60" height="34" class="byt"/><text x="660" y="42" text-anchor="middle" class="mono">DEI</text>
+  <rect x="690" y="20" width="250" height="34" class="byt"/><text x="815" y="42" text-anchor="middle" class="mono">VID 12 bits</text>
+  <text x="500" y="76" class="m mono">0x07D0 = 000 0 0111 1101 0000  → PCP 0, VID 2000</text>
+  <text x="500" y="98" class="m mono">0x0064 = 000 0 0000 0110 0100  → PCP 0, VID 100</text>
+  <text x="500" y="120" class="m mono">0xE0C8 = 111 0 0000 1100 1000  → PCP 7, VID 200</text>
+</svg>
+
+<h2 id="settings">2. Main diagram: where the value comes from, where the command comes from</h2>
+<p>Each tag has two things the MAC needs to know: the <b>value</b> (2-byte TCI) and the <b>command</b> (none / remove / insert / replace). Each has two sources, chosen by a "switch" bit in a register. The red path is the switch position used in this project.</p>
+<svg viewBox="0 0 960 560" role="img" aria-label="Value and command sources for the outer and inner tags">
+  <!-- column titles -->
+  <rect x="10" y="8" width="460" height="30" rx="6" class="s"/><text x="240" y="28" text-anchor="middle" class="b">OUTER TAG · register ETH_MACVIR p.3126</text>
+  <rect x="490" y="8" width="460" height="30" rx="6" class="cc"/><text x="720" y="28" text-anchor="middle" class="b">INNER TAG · register ETH_MACIVIR p.3127</text>
+
+  <!-- ===== OUTER: value ===== -->
+  <text x="14" y="68" class="b">2-byte value</text>
+  <rect x="14" y="78" width="190" height="40" rx="6" class="ctx"/>
+  <text x="109" y="95" text-anchor="middle" class="mono">context TDES3.VT [15:0]</text><text x="109" y="111" text-anchor="middle" class="m">0x07D0 in the test</text>
+  <rect x="14" y="128" width="190" height="40" rx="6" class="reg"/>
+  <text x="109" y="145" text-anchor="middle" class="mono">MACVIR.VLT [15:0]</text><text x="109" y="161" text-anchor="middle" class="m">fixed value in the register</text>
+  <path d="M204 98 L250 98 L250 123" class="sw"/>
+  <path d="M204 148 L250 148 L250 123" class="ln2"/>
+  <text x="258" y="104" class="m">VLTI = 1 ← test</text><text x="258" y="152" class="m">VLTI = 0</text>
+  <path d="M250 123 L330 123" class="ln"/><polygon points="330,118 340,123 330,128" fill="currentColor"/>
+  <rect x="342" y="106" width="118" height="34" rx="6" class="mac"/><text x="401" y="128" text-anchor="middle">outer tag value</text>
+
+  <!-- ===== OUTER: command ===== -->
+  <text x="14" y="206" class="b">Command</text>
+  <rect x="14" y="216" width="190" height="40" rx="6" class="nrm"/>
+  <text x="109" y="233" text-anchor="middle" class="mono">frame TDES2.VTIR [15:14]</text><text x="109" y="249" text-anchor="middle" class="m">set separately for EACH frame</text>
+  <rect x="14" y="266" width="190" height="40" rx="6" class="reg"/>
+  <text x="109" y="283" text-anchor="middle" class="mono">MACVIR.VLC [17:16]</text><text x="109" y="299" text-anchor="middle" class="m">one command for EVERY frame</text>
+  <path d="M204 236 L250 236 L250 261" class="sw"/>
+  <path d="M204 286 L250 286 L250 261" class="ln2"/>
+  <text x="258" y="242" class="m">VLP = 0 ← test</text><text x="258" y="290" class="m">VLP = 1</text>
+  <path d="M250 261 L330 261" class="ln"/><polygon points="330,256 340,261 330,266" fill="currentColor"/>
+  <rect x="342" y="244" width="118" height="34" rx="6" class="mac"/><text x="401" y="266" text-anchor="middle">outer tag command</text>
+
+  <!-- ===== OUTER: type ===== -->
+  <text x="14" y="344" class="b">Type</text>
+  <rect x="14" y="354" width="190" height="40" rx="6" class="reg"/>
+  <text x="109" y="371" text-anchor="middle" class="mono">MACVIR.CSVL [19]</text><text x="109" y="387" text-anchor="middle" class="m">1 = 88 A8 (test) · 0 = 81 00</text>
+  <path d="M204 374 L330 374" class="ln"/><polygon points="330,369 340,374 330,379" fill="currentColor"/>
+  <rect x="342" y="357" width="118" height="34" rx="6" class="mac"/><text x="401" y="379" text-anchor="middle">outer tag type</text>
+
+  <!-- ===== INNER: value ===== -->
+  <text x="494" y="68" class="b">2-byte value</text>
+  <rect x="494" y="78" width="190" height="40" rx="6" class="ctx"/>
+  <text x="589" y="95" text-anchor="middle" class="mono">context TDES2.IVT [31:16]</text><text x="589" y="111" text-anchor="middle" class="m">0x0064 in the test</text>
+  <rect x="494" y="128" width="190" height="40" rx="6" class="reg"/>
+  <text x="589" y="145" text-anchor="middle" class="mono">MACIVIR.VLT [15:0]</text><text x="589" y="161" text-anchor="middle" class="m">fixed value in the register</text>
+  <path d="M684 98 L730 98 L730 123" class="sw"/>
+  <path d="M684 148 L730 148 L730 123" class="ln2"/>
+  <text x="738" y="104" class="m">VLTI = 1 ← test</text><text x="738" y="152" class="m">VLTI = 0</text>
+  <path d="M730 123 L810 123" class="ln"/><polygon points="810,118 820,123 810,128" fill="currentColor"/>
+  <rect x="822" y="106" width="118" height="34" rx="6" class="mac"/><text x="881" y="128" text-anchor="middle">inner tag value</text>
+
+  <!-- ===== INNER: command ===== -->
+  <text x="494" y="206" class="b">Command</text>
+  <rect x="494" y="216" width="190" height="40" rx="6" class="ctx"/>
+  <text x="589" y="233" text-anchor="middle" class="mono">context TDES3.IVTIR [19:18]</text><text x="589" y="249" text-anchor="middle" class="m">in the CONTEXT, not in the frame</text>
+  <rect x="494" y="266" width="190" height="40" rx="6" class="reg"/>
+  <text x="589" y="283" text-anchor="middle" class="mono">MACIVIR.VLC [17:16]</text><text x="589" y="299" text-anchor="middle" class="m">one command for EVERY frame</text>
+  <path d="M684 236 L730 236 L730 261" class="sw"/>
+  <path d="M684 286 L730 286 L730 261" class="ln2"/>
+  <text x="738" y="242" class="m">VLP = 0 ← case C D E</text><text x="738" y="290" class="m">VLP = 1 ← case A B</text>
+  <path d="M730 261 L810 261" class="ln"/><polygon points="810,256 820,261 810,266" fill="currentColor"/>
+  <rect x="822" y="244" width="118" height="34" rx="6" class="mac"/><text x="881" y="266" text-anchor="middle">inner tag command</text>
+
+  <!-- ===== INNER: type ===== -->
+  <text x="494" y="344" class="b">Type</text>
+  <rect x="494" y="354" width="190" height="40" rx="6" class="reg"/>
+  <text x="589" y="371" text-anchor="middle" class="mono">MACIVIR.CSVL [19]</text><text x="589" y="387" text-anchor="middle" class="m">0 = 81 00 (test) · 1 = 88 A8</text>
+  <path d="M684 374 L810 374" class="ln"/><polygon points="810,369 820,374 810,379" fill="currentColor"/>
+  <rect x="822" y="357" width="118" height="34" rx="6" class="mac"/><text x="881" y="379" text-anchor="middle">inner tag type</text>
+
+  <!-- ===== bottom: MAC output ===== -->
+  <path d="M401 391 L401 430" class="ln"/><path d="M881 391 L881 430" class="ln"/>
+  <rect x="60" y="432" width="840" height="46" rx="8" class="mac"/>
+  <text x="480" y="452" text-anchor="middle" class="b">The MAC assembles: DA SA | [outer type + outer value] | [inner type + inner value] | EtherType | payload</text>
+  <text x="480" y="470" text-anchor="middle" class="m">the outer tag always comes before the inner tag, regardless of the order of configuration</text>
+
+  <text x="14" y="512" class="m">Red switch = the project's configuration. Mode 5 toggles MACIVIR.VLP between case B and C to exercise both paths for the inner tag.</text>
+  <text x="14" y="534" class="m">A value taken from the context is STORED by the MAC and used for later frames until a new context arrives (mode 4 case C, mode 5 case B).</text>
+</svg>
+
+<div class="mem"><b>Memory aid 1:</b> read the bit names as questions. <b>VLTI</b> = "VLan Tag from descrIptor?" (value from the descriptor or from the register). <b>VLP</b> = "VLan Priority to register?" (does the register or the descriptor decide the command). <b>VLC</b> = "VLan Control" = the command in the register. <b>CSVL</b> = "Customer or Service VLan" = type 0x8100 or 0x88A8.</div>
+<div class="mem"><b>Memory aid 2:</b> the four commands of VTIR and IVTIR are encoded the same way: <code>00 none · 01 remove · 10 insert · 11 replace</code>. Remember "the bigger the number, the more it interferes": 0 does nothing, 1 removes, 2 adds, 3 replaces.</div>
+
+<h2 id="ring">3. Two descriptors travelling together in the TX ring</h2>
+<p>A context descriptor has no buffer. It only loads parameters into the MAC, then the DMA closes it (OWN = 0). The frame right after it uses those parameters.</p>
+<svg viewBox="0 0 960 300" role="img" aria-label="Context descriptor followed by a normal descriptor">
+  <rect x="20" y="20" width="450" height="200" rx="8" class="ctx"/>
+  <text x="245" y="44" text-anchor="middle" class="b">CONTEXT descriptor (TDES3.CTXT = 1) · p.3057</text>
+  <text x="36" y="76" class="mono">TDES0  0</text>
+  <text x="36" y="100" class="mono">TDES1  0</text>
+  <text x="36" y="124" class="mono">TDES2  IVT [31:16] = 0x0064   MSS [13:0] = 0</text>
+  <text x="36" y="148" class="mono">TDES3  OWN CTXT | IVTIR [19:18] | IVLTV VLTV | VT = 0x07D0</text>
+  <text x="36" y="178" class="m">VLTV / IVLTV = 1: VT / IVT are valid, only then does the MAC load the value</text>
+  <text x="36" y="200" class="m">After the DMA reads: OWN = 0, CDE [23] = 0. Bad context → CDE = 1, DMA stops</text>
+
+  <path d="M470 120 L520 120" class="ln"/><polygon points="520,115 530,120 520,125" fill="currentColor"/>
+  <text x="495" y="110" text-anchor="middle" class="m">next</text>
+
+  <rect x="532" y="20" width="408" height="200" rx="8" class="nrm"/>
+  <text x="736" y="44" text-anchor="middle" class="b">NORMAL descriptor (CTXT = 0) · p.3048</text>
+  <text x="548" y="76" class="mono">TDES0  buffer 1 address (60 B frame)</text>
+  <text x="548" y="100" class="mono">TDES1  0</text>
+  <text x="548" y="124" class="mono">TDES2  VTIR [15:14] = 10 insert | B1L = 60</text>
+  <text x="548" y="148" class="mono">TDES3  OWN FD LD | FL = 60 | CIC</text>
+  <text x="548" y="178" class="m">VTIR: command for the OUTER tag of this frame only</text>
+  <text x="548" y="200" class="m">There is no bit for the inner tag here</text>
+
+  <text x="20" y="252" class="m">The tail pointer ETH_DMACTXDTPR is written once and points past both. The DMA reads the context first (loading VT, IVT, IVTIR into the MAC) and only then reads the frame.</text>
+  <text x="20" y="276" class="m">To change the inner tag for the next frame: a new context. To turn the outer tag on/off for the next frame: just change VTIR, no context needed.</text>
+</svg>
+
+<h2 id="cases">4. What each case changes</h2>
+<h3>Mode 4: one tag (eth_mac_vlan_lb) · MACVIR = VLTI, CSVL = 0 → tag 0x8100</h3>
+<table>
+<tr><th>Case</th><th>New context</th><th>VTIR frame</th><th>Received</th><th>Proves</th></tr>
+<tr><td class="c">A</td><td>no</td><td>none</td><td>60 B, no tag</td><td>the frame passes through untouched, used as the reference</td></tr>
+<tr><td class="c">B</td><td>VT = 0x0064</td><td>insert</td><td>64 B, <code>81 00 00 64</code></td><td>the MAC inserts the value taken from the context</td></tr>
+<tr><td class="c">C</td><td>no</td><td>insert</td><td>64 B, tag A again</td><td>the context value is stored by the MAC for later frames</td></tr>
+<tr><td class="c">D</td><td>no</td><td>none</td><td>60 B</td><td>VTIR decides per frame, even though the value is still stored</td></tr>
+<tr><td class="c">E</td><td>VT = 0xE0C8</td><td>insert</td><td>64 B, <code>81 00 E0 C8</code></td><td>a new context overwrites the old value</td></tr>
+<tr><td class="c">F</td><td>WRONG: CTXT + FD + LD</td><td>no frame sent</td><td>TDES3 CDE [23] = 1, DMACSR CDE [13] = 1</td><td>the DMA rejects the bad context and stops TX; must be the last case</td></tr>
+</table>
+
+<h3>Mode 5: two QinQ tags (eth_mac_qinq_lb) · MACVIR = VLTI | CSVL → outer tag 0x88A8</h3>
+<table>
+<tr><th>Case</th><th>MACIVIR</th><th>Inner tag command</th><th>New context</th><th>Frame sent</th><th>VTIR</th><th>Received</th></tr>
+<tr><td class="c">A</td><td>VLTI, VLP = 1, VLC = insert</td><td>register: insert</td><td>VT 07D0, IVT 0064</td><td>60 B bare</td><td>insert</td><td>68 B, 2 tag</td></tr>
+<tr><td class="c">B</td><td>0 (off)</td><td>off</td><td>no</td><td>60 B bare</td><td>insert</td><td>64 B, S-tag only</td></tr>
+<tr><td class="c">C</td><td>VLTI, VLP = 0</td><td>context IVTIR = insert</td><td>VT 07D0, IVT 0064</td><td>60 B bare</td><td>insert</td><td>68 B, 2 tag</td></tr>
+<tr><td class="c">D</td><td>VLTI, VLP = 0</td><td>context IVTIR = replace</td><td>VT 07D0, IVT 0064</td><td>68 B already carrying S 07D0 + C E0C8</td><td>none</td><td>68 B, C-tag becomes 0064</td></tr>
+<tr><td class="c">E</td><td>VLTI, VLP = 0</td><td>context IVTIR = remove</td><td>VT 07D0, IVT 0064</td><td>68 B already carrying 2 tags</td><td>none</td><td>64 B, the C-tag is gone</td></tr>
+</table>
+<p>Each step changes only one thing: A→B register off · B→C switch to the descriptor · C→D insert becomes replace + frame already tagged · D→E replace becomes remove.</p>
+
+<div class="warn"><b>Not certain yet, waiting for the board:</b> D and E rely on the RM sentence "MACIVIR processes bytes 17..20" (offset 16..19). The RM does not say whether the MAC checks that the first 2 bytes there are 0x8100. The "frame received" dump will answer that.</div>
+
+<h2 id="rx">5. What the receive side reports (same MAC, because of loopback)</h2>
+<table>
+<tr><th>Where</th><th>Meaning</th><th>Expected value</th></tr>
+<tr><td><code>ETH_MACVTR.ESVL</code> [18] p.3122</td><td>0x88A8 is also treated as VLAN on receive</td><td>1, otherwise the S-tag is seen as an unknown EtherType</td></tr>
+<tr><td><code>RDES3.LT</code> [18:16] p.3069</td><td>received frame type</td><td>1 = normal type · 4 = one tag · 5 = two tags (0 = length, 3 = ARP, 6 = control)</td></tr>
+<tr><td><code>RDES0</code> [15:0] p.3065</td><td>TCI of the outer tag</td><td>0x0064 / 0xE0C8 (mode 4), 0x07D0 (mode 5)</td></tr>
+<tr><td><code>RDES0</code> [31:16]</td><td>inner tag TCI</td><td>only present when stripping is enabled; this test does not enable it</td></tr>
+<tr><td><code>RDES2.VF</code> [15] p.3068</td><td>the tag passed the VLAN filter (mode 8, 9)</td><td>only valid when RDES3.RS2V = 1 and the frame has a tag</td></tr>
+</table>
+
+<h3>Receive-side VLAN filter (mode 8, 9): lessons from the board on 2026-11-12 and 11-13</h3>
+<p>Each case of mode 8 is explained separately on the <a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a> page. Below is a summary.</p>
+<p>The filter is a <b>whitelist for exactly one tag type</b> (ERSVLM chooses C or S), not a gate that blocks everything else. The gatekeeper asks two questions: (1) is the tag the right type? (2) does the number match VL / the hash table? If question 1 fails, <b>question 2 is not asked</b> and nothing is blocked either.</p>
+<pre>untagged frame                            -> out of scope  -> received
+tagged, right type, number matches        -> match         -> received, VF = 1
+tagged, right type, number differs        -> no match      -> VTFE = 1: DROPPED, no descriptor
+tagged, WRONG type (ERSVLM)               -> out of scope  -> received intact, RS2V = 0, VF = - (K1; mode 9 E/F board 11-16)
+ERIVLT = 1 but the frame has only one tag -> out of scope  -> received intact, RS2V = 0, VF = - (board 11-13)
+tagged, compared but MISSED, VTFE = 0     -> received (stripped/kept per EVLS), RS2V = 0, VF = - : the MAC never reports VF = 0 (mode 9 C/D1 board 11-16)
+DOVLTC = 1                                -> skip question 1, always compare the number (case K2)
+VL = 0                                    -> every tag matches, even with VTHM = 1      (case G)
+VTIM = 1                                  -> invert the result of question 2: blacklist (case F)
+VTHM = 1                                  -> adds matching through a 16-entry hash table, in parallel with VL</pre>
+<p>The MMC counter <code>ETH_RX_UNICAST_PACKETS_GOOD</code> also counts frames dropped by the VLAN filter: it sits before the filter, so it cannot be used as evidence of a drop.</p>
+
+<h2 id="regs">6. Bit table, one place to look things up</h2>
+<table>
+<tr><th>Register / descriptor</th><th>Bit</th><th>What it does</th><th>Project</th><th>RM0399</th></tr>
+<tr><td rowspan="4"><code>ETH_MACVIR</code> (outer tag)</td><td>VLTI [20]</td><td>1: value from context TDES3.VT · 0: from VLT [15:0]</td><td>1</td><td rowspan="4">p.3126</td></tr>
+<tr><td>CSVL [19]</td><td>1: type 0x88A8 · 0: 0x8100</td><td>0 mode 4 · 1 mode 5</td></tr>
+<tr><td>VLP [18]</td><td>1: VLC applies to every frame · 0: the frame's VTIR</td><td>0</td></tr>
+<tr><td>VLC [17:16]</td><td>command when VLP = 1</td><td>–</td></tr>
+<tr><td rowspan="4"><code>ETH_MACIVIR</code> (inner tag)</td><td>VLTI [20]</td><td>1: value from context TDES2.IVT · 0: from VLT [15:0]</td><td>1</td><td rowspan="4">p.3127</td></tr>
+<tr><td>CSVL [19]</td><td>1: 0x88A8 · 0: 0x8100</td><td>0</td></tr>
+<tr><td>VLP [18]</td><td>1: VLC applies to every frame · 0: the context's IVTIR</td><td>1 case A B · 0 case C D E</td></tr>
+<tr><td>VLC [17:16]</td><td>command when VLP = 1</td><td>insert case A · none case B</td></tr>
+<tr><td><code>TDES2</code> frame</td><td>VTIR [15:14]</td><td>outer tag command for this frame</td><td>per case</td><td>p.3050</td></tr>
+<tr><td rowspan="5"><code>TDES2/3</code> context</td><td>TDES2.IVT [31:16]</td><td>inner tag value</td><td>0x0064</td><td rowspan="5">p.3057-3060</td></tr>
+<tr><td>TDES3.VT [15:0]</td><td>outer tag value</td><td>0x07D0 / 0x0064 / 0xE0C8</td></tr>
+<tr><td>TDES3.VLTV [16], IVLTV [17]</td><td>VT / IVT valid</td><td>1</td></tr>
+<tr><td>TDES3.IVTIR [19:18]</td><td>inner tag command when MACIVIR.VLP = 0</td><td>none / insert / replace / remove</td></tr>
+<tr><td>TDES3.CDE [23] (write-back)</td><td>the DMA rejects the context</td><td>0, except mode 4 case F</td></tr>
+<tr><td><code>ETH_DMACSR</code></td><td>CDE [13], AIS [14]</td><td>context error flag on the DMA channel, write 1 to clear</td><td>case F only</td><td>p.3095</td></tr>
+</table>
+
+<div class="tip"><b>Reading the log quickly:</b> column <code>bytes 12..21</code> is the 10 bytes right after the SA. Starts with <code>88 B5</code> → no tag. <code>81 00</code> → one C-tag. <code>88 A8 .. .. 81 00</code> → QinQ. Column <code>LT</code> must match the number of tags. Column <code>ctx TDES3</code> must be <code>0x40000000</code> (only CTXT left, OWN 0, CDE 0).</div>
+</main>
+</body>
+</html>

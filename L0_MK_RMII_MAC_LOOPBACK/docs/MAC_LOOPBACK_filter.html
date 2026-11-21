@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Table-driven address filter: mode 1</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1d1f;--muted:#5d636b;--line:#cdd0d5;--card:#ffffff;--accent:#0b63c5;--accent-bg:#e2eefb;
+--warn:#a8590a;--warn-bg:#fdf0d0;--ok:#157a3b;--ok-bg:#e0f3e6;--bad:#b3261e;--bad-bg:#fbe4e2;--code:#f0f1f3;--g:#6b3fb3;--g-bg:#efe8fb;--t:#0f766e;--t-bg:#dcf2ef}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:60px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:6px;align-items:center;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:13.5px;flex-wrap:wrap}
+.top .brand{font-weight:700;margin-right:12px;white-space:nowrap}
+.top a{padding:4px 12px;border-radius:99px;text-decoration:none;color:var(--fg);border:1px solid var(--line);white-space:nowrap}
+.top a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 80px;min-width:0}
+h1{font-size:28px;margin:0 0 6px;line-height:1.25}
+h2{font-size:21px;margin:48px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:26px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:15.5px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+.case{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:12px 18px;margin:18px 0}
+.case.drop{border-left-color:var(--bad)}
+.case h3{margin:4px 0 8px}
+.case pre{margin:4px 0;font-size:12.5px;line-height:1.4}
+.case .tag{display:inline-block;font-size:12.5px;padding:1px 9px;border-radius:99px;border:1px solid var(--line);margin-left:8px;vertical-align:middle;font-weight:500}
+.case .tag.p{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.case .tag.d{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.tip{border-left:4px solid var(--ok);background:var(--ok-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.warn{border-left:4px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.mem{border-left:4px solid var(--g);background:var(--g-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:15.5px}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.5;margin:10px 0}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-bg)}
+td.c{text-align:center}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.toc{columns:2;column-gap:28px;font-size:14px}
+.toc a{text-decoration:none}
+svg{width:100%;height:auto;display:block;margin:12px 0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+svg text{fill:var(--fg);font-size:13px}
+svg .m{fill:var(--muted);font-size:12px}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+svg .b{font-weight:700}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .reg{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.4}
+svg .mac{fill:var(--t-bg);stroke:var(--t);stroke-width:1.4}
+svg .okb{fill:var(--ok-bg);stroke:var(--ok);stroke-width:1.4}
+svg .badb{fill:var(--bad-bg);stroke:var(--bad);stroke-width:1.4}
+svg .byt{fill:var(--code);stroke:var(--line);stroke-width:1}
+svg .s{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1}
+svg .cc{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1}
+svg .ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+svg .ln2{stroke:var(--muted);stroke-width:1.1;fill:none;stroke-dasharray:4 3}
+@media (max-width:600px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="top"><span class="brand">MAC loopback</span>
+<a class="on" href="#">Table filter (mode 1)</a><a href="MAC_LOOPBACK_burst.html">DMA burst (mode 2)</a><a href="MAC_LOOPBACK_ptp.html">PTP (mode 3)</a><a href="MAC_LOOPBACK_vlan_tag.html">VLAN tag (mode 4, 5)</a><a href="MAC_LOOPBACK_tso.html">TSO (mode 6)</a><a href="MAC_LOOPBACK_coe.html">Checksum (mode 7)</a><a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a><a href="MAC_LOOPBACK_sa_cpc.html">SA / CRC (mode 10)</a><a href="MAC_LOOPBACK_addr_filter.html">Address filter (mode 11)</a><a href="MAC_LOOPBACK_istat.html">Interrupts: status (mode 12)</a></div>
+<main>
+<h1>Table-driven MAC address filter: mode 1 case by case</h1>
+<p class="lead">Cheat sheet for <code>eth_run_test_ops = 1</code> (<code>eth_mac_filter_lb</code>, file <code>eth_filter_functions.c</code>). STM32H755, RM0399 Rev 4. This is the address-filter test written <b>before</b> mode 11, in the <code>CASES[]</code> table style: 24 rows, each row a rule + a frame + a prediction. Run on the board on 2026-10-16 and 2026-10-20: 24/24. Mode 11 (<a href="MAC_LOOPBACK_addr_filter.html">its own page</a>) redoes the same topic in framework style and adds slots 2 and 3.</p>
+
+<div class="mem"><b>Mnemonic:</b> <i>One case = write the hash table, write MACA1, write MACPFR (in exactly that order), send a 22-byte frame carrying "FILT" + a sequence number, then ask: did it come back? RDES2 is only written by the MAC on a slot 1 match, a hash match, or RA = 1.</i></div>
+
+<div class="card toc">
+<a href="#idea">1. What mode 1 tests</a><br>
+<a href="#row">2. What a CASES[] row holds</a><br>
+<a href="#regs">3. Registers written per case (apply_filter)</a><br>
+<a href="#addrs">4. Eleven addresses and their hash indexes</a><br>
+<a href="#frame">5. The 22-byte frame and how it is recognised</a><br>
+<a href="#log">6. Reading the result line</a><br>
+<a href="#cases">7. Twenty-four cases</a><br>
+<a href="#lessons">8. Lessons from the board</a><br>
+<a href="#bits">9. Bit table for lookup</a><br>
+<a href="#todo">10. Cases worth adding (moved to mode 11)</a>
+</div>
+
+
+<h2 id="idea">1. What mode 1 tests</h2>
+<p>In mode 0 and 2..10, <code>mac_basic_init</code> leaves ETH_MACPFR.PR = 1, so the MAC accepts every DA. Mode 1 turns PR off (except case A1) and tests each switch of the address filter: the perfect slots MACA0 / MACA1, the MBC byte mask, broadcast and DBF, multicast with PM and the hash table, unicast through the hash with HUC / HPF, the DAIF inversion, Receive All, and sender filtering with SAF. Each case is one row of the <code>CASES[]</code> table; adding a case = adding a row.</p>
+<svg viewBox="0 0 960 250" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<rect x="10" y="20" width="200" height="70" rx="8" class="box"/><text x="110" y="45" text-anchor="middle" class="b">CASES[i]</text>
+<text x="110" y="65" text-anchor="middle" class="m">pfr, hash[], a1, a1_flags,</text><text x="110" y="81" text-anchor="middle" class="m">da, sa, expect</text>
+<path d="M210 55 H255" class="ln" marker-end="url(#a)"/>
+<rect x="258" y="20" width="220" height="70" rx="8" class="reg"/><text x="368" y="45" text-anchor="middle" class="b">apply_filter()</text>
+<text x="368" y="63" text-anchor="middle" class="m">ETH_MACHT0R/1R → MACA1HR/LR</text><text x="368" y="80" text-anchor="middle" class="m">→ ETH_MACPFR (written last)</text>
+<path d="M478 55 H523" class="ln" marker-end="url(#a)"/>
+<rect x="526" y="20" width="190" height="70" rx="8" class="mac"/><text x="621" y="45" text-anchor="middle" class="b">egress_packet()</text>
+<text x="621" y="63" text-anchor="middle" class="m">22 byte: DA SA 88B5</text><text x="621" y="80" text-anchor="middle" class="m">"FILT" + case number</text>
+<path d="M716 55 H761" class="ln" marker-end="url(#a)"/>
+<rect x="764" y="20" width="186" height="70" rx="8" class="mac"/><text x="857" y="45" text-anchor="middle" class="b">MAC loopback</text>
+<text x="857" y="63" text-anchor="middle" class="m">address filter on RX</text><text x="857" y="80" text-anchor="middle" class="m">(RM figure 830 p.2954)</text>
+<path d="M857 90 V125" class="ln" marker-end="url(#a)"/>
+<rect x="690" y="128" width="260" height="56" rx="8" class="box"/><text x="820" y="150" text-anchor="middle" class="b">ingress_packet_status() ≤ 5 ms</text>
+<text x="820" y="170" text-anchor="middle" class="m">find the frame with "FILT" + its case number</text>
+<path d="M690 156 H640" class="ln" marker-end="url(#a)"/>
+<rect x="430" y="128" width="205" height="56" rx="8" class="okb"/><text x="532" y="150" text-anchor="middle" class="b">got = 1 → PASS</text><text x="532" y="170" text-anchor="middle" class="m">RDES2/RDES3 kept for printing</text>
+<rect x="430" y="196" width="205" height="44" rx="8" class="badb"/><text x="532" y="223" text-anchor="middle" class="b">len = −1 → DROP</text>
+<path d="M820 184 V218 H640" class="ln2" marker-end="url(#a)"/>
+<rect x="10" y="128" width="380" height="112" rx="8" class="cc"/><text x="200" y="152" text-anchor="middle" class="b">compared with expect → OK / BAD</text>
+<text x="200" y="175" text-anchor="middle" class="m">in: ID DA MACPFR HT1R HT0R hashDA | expect actual |</text>
+<text x="200" y="193" text-anchor="middle" class="m">HF MADRM DAF SAF | result</text>
+<text x="200" y="222" text-anchor="middle" class="m">end of test: dump TX/RX of every case, MACPFR = PR</text>
+<path d="M430 156 H395" class="ln" marker-end="url(#a)"/><path d="M430 218 H395" class="ln" marker-end="url(#a)"/>
+</svg>
+<p>It differs from mode 11 in three ways: (1) the frame is 22 bytes and the MAC pads it to 60, so only the first 22 bytes are compared; (2) only slot 1 is used, no slot 2 or 3; (3) the results print as one compact table, with frame dumps at the end. Mode 11 has step-by-step <code>af_case</code>, FLOW, and a separate RS2V column.</p>
+
+<h2 id="row">2. What a CASES[] row holds</h2>
+<table>
+<tr><th>Field</th><th>Type</th><th>Meaning</th><th>Example (B5)</th></tr>
+<tr><td>id</td><td>string</td><td>short name, printed at the start of the line</td><td>"B5"</td></tr>
+<tr><td>what</td><td>string</td><td>description, printed at the end of the line</td><td>"group: MACA1 = board, last byte masked"</td></tr>
+<tr><td>pfr</td><td>uint32</td><td>value written as is into ETH_MACPFR (0 = perfect only, PR = 0)</td><td>0</td></tr>
+<tr><td>hash[3]</td><td>3 address pointers</td><td>addresses put into the hash table, NULL-terminated</td><td>{0}</td></tr>
+<tr><td>a1</td><td>address pointer</td><td>address loaded into MACA1; NULL = slot 1 off (reset value written, AE = 0)</td><td>BOARD</td></tr>
+<tr><td>a1_flags</td><td>uint32</td><td>MACAHR_SA, MBC_BYTE(k) for slot 1; AE is added on top</td><td>MBC_BYTE(5)</td></tr>
+<tr><td>da</td><td>pointer</td><td>DA of the sent frame</td><td>BOARD_1</td></tr>
+<tr><td>sa</td><td>pointer</td><td>SA of the frame; NULL = BOARD</td><td>NULL</td></tr>
+<tr><td>expect</td><td>int</td><td>1 = PASS (frame comes back), 0 = DROP</td><td>1</td></tr>
+</table>
+
+<p><code>MBC_BYTE(k) = 1 &lt;&lt; (24 + k)</code>: bit 24 masks byte 0 (LR[7:0]), bit 29 masks byte 5 (HR[15:8]). Mode 11 uses the same macro under the name <code>AF_MBC_BYTE</code>.</p>
+
+<h2 id="regs">3. Registers written per case (apply_filter)</h2>
+<table>
+<tr><th>Order</th><th>Register</th><th>Bit</th><th>Value</th><th>Why</th><th>RM</th></tr>
+<tr><td>1</td><td>ETH_MACHT0R</td><td>HT31T0 [31:0]</td><td>ht[0]</td><td>one bit for each hash value 0..31</td><td>p.3121</td></tr>
+<tr><td>2</td><td>ETH_MACHT1R</td><td>HT63T32 [31:0]</td><td>ht[1]</td><td>hash 32..63; hash bit 5 selects the register, bits 4:0 select the bit</td><td>p.3122</td></tr>
+<tr><td>3</td><td>ETH_MACA1HR</td><td>AE [31]</td><td>1 / 0</td><td>slot 1 used / not used (a1 NULL → write 0x0000FFFF = reset)</td><td>p.3155</td></tr>
+<tr><td></td><td></td><td>SA [30]</td><td>a1_flags</td><td>1: compare against the frame's SA instead of the DA</td><td></td></tr>
+<tr><td></td><td></td><td>MBC [29:24]</td><td>a1_flags</td><td>bit k = 1: ignore byte k</td><td></td></tr>
+<tr><td></td><td></td><td>ADDRHI [15:0]</td><td>a1[5] &lt;&lt; 8 | a1[4]</td><td>byte 5, 4</td><td></td></tr>
+<tr><td>4</td><td>ETH_MACA1LR</td><td>ADDRLO [31:0]</td><td>a1[3..0]</td><td>byte 3 in [31:24] … byte 0 in [7:0]; a1 NULL → 0xFFFFFFFF</td><td>p.3154</td></tr>
+<tr><td>5</td><td>ETH_MACPFR</td><td>PR HUC HMC DAIF PM DBF SAF HPF RA</td><td>c->pfr</td><td>written last, once the addresses and hash are ready</td><td>p.3118-3120</td></tr>
+</table>
+
+<div class="tip">After each write, <code>write_filter_reg</code> waits 1 µs: the filter runs in the RX clock domain (RMII 50 MHz), and back-to-back writes may not have crossed into that domain yet. Mode 1 writes HR before LR (the opposite of the "LR first, HR after" advice of mode 10/11); harmless here because the frame is only sent after both are written and the wait is over.</div>
+
+<h2 id="addrs">4. Eleven addresses and their hash indexes</h2>
+<table>
+<tr><th>Name in the code</th><th>Address</th><th>What it is</th><th>hashDA</th><th>Case</th></tr>
+<tr><td>BOARD</td><td>00:80:E1:00:00:00</td><td>the board's MACA0 (ETH_TEST_SRC_MAC)</td><td>13</td><td>B1 B5 E2 E3 F1 H1 H2</td></tr>
+<tr><td>BOARD_1</td><td>00:80:E1:00:00:01</td><td>board, last byte off</td><td>23</td><td>B3 B5</td></tr>
+<tr><td>PEER</td><td>6C:1F:F7:CA:2B:FD</td><td>another unicast (DA of the test traffic)</td><td>34</td><td>A1 B2 B4 E1 F2 G1</td></tr>
+<tr><td>BCAST</td><td>FF:FF:FF:FF:FF:FF</td><td>broadcast</td><td>0</td><td>C1 C2</td></tr>
+<tr><td>MDNS</td><td>01:00:5E:00:00:FB</td><td>multicast mDNS 224.0.0.251</td><td>48</td><td>D1 D2 D3</td></tr>
+<tr><td>ALLHOST</td><td>01:00:5E:00:00:01</td><td>multicast all-hosts 224.0.0.1</td><td>32</td><td>D4</td></tr>
+<tr><td>ALLRTR</td><td>01:00:5E:00:00:02</td><td>multicast all-routers 224.0.0.2</td><td>55</td><td>D5</td></tr>
+<tr><td>LEAK32</td><td>01:00:5E:00:00:18</td><td>deliberately shares a hash with ALLHOST</td><td>32</td><td>D6</td></tr>
+<tr><td>LEAK48</td><td>01:00:5E:00:00:C9</td><td>deliberately shares a hash with MDNS</td><td>48</td><td>D7</td></tr>
+<tr><td>IPV6ALL</td><td>33:33:00:00:00:01</td><td>multicast IPv6 all-nodes</td><td>1</td><td>D8</td></tr>
+<tr><td>OTHER_SA</td><td>02:00:00:00:00:99</td><td>unknown sender (used only as SA)</td><td></td><td>H2</td></tr>
+</table>
+
+<p>hashDA = <code>bit_reverse32(crc32_ieee(addr, 6)) &gt;&gt; 26</code>: the Ethernet CRC-32 of the 6 bytes (bit 0 of byte 0 first), bit-reversed over 32 bits, top 6 bits taken. The board confirms it at D3 D4 D6 D7 E1: RDES2.MADRM = exactly this number. The two LEAK addresses were found by trying last bytes until the bits collided: an illustration of the hash's "imperfect filtering".</p>
+
+<h2 id="frame">5. The 22-byte frame and how it is recognised</h2>
+<pre>TX 22 bytes: DA (6) | SA (6) | 88 B5 | 46 49 4C 54 ("FILT") | n (case number) | 00 00 00
+RX 60 bytes: the 22 bytes above + 38 zero bytes padded by the MAC (ETH_MACCR.ACS = 1 keeps the pad, CST = 1 drops the FCS)</pre>
+<p>Why "FILT" + n is needed: a frame held back by the filter never comes back, but a frame from the previous case may still be in the queue. <code>run_case</code> calls <code>eth_rx_flush</code> first, then while receiving it loops at most <code>MAC_100M_RX_DESC_CNT</code> times and only accepts a frame with the right case number; <code>len = −1</code> (5 ms elapsed) is DROP. Each case keeps RDES2, RDES3, the 22 sent bytes and the first 64 received bytes for the dump at the end.</p>
+
+<h2 id="log">6. Reading the result line</h2>
+<pre>ID  DA sent            MACPFR     HT1R     HT0R     hashDA | expect  actual  | HF MADRM DAF SAF | result
+B4  6C:1F:F7:CA:2B:FD  0x00000000 00000000 00000000 34     | PASS    PASS    |  0     1   0   0 | OK   perfect: PEER added to MACA1
+D3  01:00:5E:00:00:FB  0x00000004 00010001 00000000 48     | PASS    PASS    |  1    48   0   0 | OK  (hash match)
+E2  00:80:E1:00:00:00  0x00000002 00000004 00000000 13     | DROP    DROP    |  -     -   -   - | OK   HUC=1, HPF=0: send board (hash only)
+G1  6C:1F:F7:CA:2B:FD  0x80000000 00000000 00000000 34     | PASS    PASS    |  0     0   1   0 | OK   RA=1: other DA passes, DAF=1</pre>
+<table>
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td>MACPFR, HT1R, HT0R</td><td>the value written for this case</td></tr>
+<tr><td>hashDA</td><td>the hash index the software computes for the DA (even if the case does not use the hash): for comparison with MADRM</td></tr>
+<tr><td>expect / actual</td><td>PASS = the frame came back, DROP = it did not; TX ERR if egress_packet failed</td></tr>
+<tr><td>HF MADRM DAF SAF</td><td>RDES2 written by the MAC, only printed when RDES3.RS2V = 1; "-" = not written by the MAC. HF = 1 → MADRM is the hash computed by the hardware and the code prints "(hash match)" / "(hash DIFFERS!)"; HF = 0 → MADRM is the number of the matching slot</td></tr>
+<tr><td>result</td><td>OK when actual = expect; BAD means either the prediction is wrong (tables 549/550) or the silicon differs from the RM</td></tr>
+</table>
+
+<p>At the end of the table: <code>Result: n/24 lines as expected</code>, then (when FLOW_LOG ≥ 1) the PACKETS section dumps the TX 22 bytes / RX 60 bytes of each case and a "first 22 bytes of RX SAME AS TX" line. After that the filter returns to PR = 1, hash 0, MACA1 off.</p>
+
+<h2 id="cases">7. Twenty-four cases</h2>
+<p>Every case: MACA0 = 00:80:E1:00:00:00, SA = BOARD except H2. "Expected / board": the prediction in the table and the actual result (log <code>COM3_2026_10_16.16.21.10.222.txt</code>, repeated on 10-20).</p>
+<h3>A. PR = 1</h3>
+<div class="case" id="cA1"><h3>A1: PR = 1: an unknown DA still passes <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000001 (PR [0]). HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 6C 1F F7 CA 2B FD  00 80 E1 00 00 00  88 B5  46 49 4C 54 01 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 34</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>Promiscuous: the filter does not look at the DA. This is the state of mode 0 and 2..10.</td></tr>
+</table></div>
+
+<h3>B. Perfect (HUC = 0): full 48-bit comparison with MACA0..MACA3</h3>
+<div class="case" id="cB1"><h3>B1: perfect: DA = board (MACA0) <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000000. HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 00  00 80 E1 00 00 00  88 B5  46 49 4C 54 02 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 13</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>MACA0 is always on, full 48-bit comparison, match. RS2V = 0: on a slot 0 match the MAC does not write RDES2.</td></tr>
+</table></div>
+
+<div class="case drop" id="cB2"><h3>B2: perfect: unknown DA <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000000. HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 6C 1F F7 CA 2B FD  00 80 E1 00 00 00  88 B5  46 49 4C 54 03 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 34</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>No slot holds PEER, and HUC = 0 so the hash is not consulted. Table 549 p.2956: fail.</td></tr>
+</table></div>
+
+<div class="case drop" id="cB3"><h3>B3: perfect: only the last byte differs <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000000. HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 01  00 80 E1 00 00 00  88 B5  46 49 4C 54 04 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 23</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>48-bit comparison: 01 ≠ 00 in byte 5 is enough to drop.</td></tr>
+</table></div>
+
+<div class="case" id="cB4"><h3>B4: perfect: PEER loaded into MACA1 <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000000. HT1R = HT0R = 0. MACA1: PEER, AE = 1.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 6C 1F F7 CA 2B FD  00 80 E1 00 00 00  88 B5  46 49 4C 54 05 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 34</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 0, MADRM = 1, DAF = 0, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>Slot 1 is ORed with slot 0. RDES2 is written: HF = 0, MADRM = 1 = the number of the matching slot.</td></tr>
+</table></div>
+
+<div class="case" id="cB5"><h3>B5: group: MACA1 = board, last byte masked <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000000. HT1R = HT0R = 0. MACA1: BOARD, AE | MBC bit 29.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 01  00 80 E1 00 00 00  88 B5  46 49 4C 54 06 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 23</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 0, MADRM = 1, DAF = 0, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>MBC bit 24 + 5 = 29: byte 5 is not compared. The first 5 bytes match → passes, MADRM = 1.</td></tr>
+</table></div>
+
+<h3>C. Broadcast</h3>
+<div class="case" id="cC1"><h3>C1: broadcast, DBF = 0 <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000000. HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: FF FF FF FF FF FF  00 80 E1 00 00 00  88 B5  46 49 4C 54 07 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 0</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>Broadcast passes without any configuration (table 549).</td></tr>
+</table></div>
+
+<div class="case drop" id="cC2"><h3>C2: broadcast, DBF = 1 <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000020 (DBF [5]). HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: FF FF FF FF FF FF  00 80 E1 00 00 00  88 B5  46 49 4C 54 08 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 0</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>DBF "overrides all other filter settings" (p.3119).</td></tr>
+</table></div>
+
+<h3>D. Multicast: perfect, PM, hash</h3>
+<div class="case drop" id="cD1"><h3>D1: perfect multicast: not in any MACAx <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000000. HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 01 00 5E 00 00 FB  00 80 E1 00 00 00  88 B5  46 49 4C 54 09 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 48</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>PM = 0, HMC = 0: multicast is compared against the slots, and no slot holds mDNS.</td></tr>
+</table></div>
+
+<div class="case" id="cD2"><h3>D2: PM = 1: every multicast passes <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000010 (PM [4]). HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 01 00 5E 00 00 FB  00 80 E1 00 00 00  88 B5  46 49 4C 54 0A 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 48</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>Pass all Multicast. RS2V = 0.</td></tr>
+</table></div>
+
+<div class="case" id="cD3"><h3>D3: hash {mDNS, all-hosts}: send mDNS <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000004 (HMC [2]). HT1R = 0x00010001 (bit 48 → bit 16, bit 32 → bit 0), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 01 00 5E 00 00 FB  00 80 E1 00 00 00  88 B5  46 49 4C 54 0B 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 48</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 1, MADRM = 48, DAF = 0, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>Bit 48 = HT1R bit 16. HF = 1, MADRM = 48 = hashDA: the hardware uses the same formula.</td></tr>
+</table></div>
+
+<div class="case" id="cD4"><h3>D4: hash {mDNS, all-hosts}: send all-hosts <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000004 (HMC [2]). HT1R = 0x00010001 (bit 48 → bit 16, bit 32 → bit 0), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 01 00 5E 00 00 01  00 80 E1 00 00 00  88 B5  46 49 4C 54 0C 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 32</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 1, MADRM = 32, DAF = 0, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>Bit 32 = HT1R bit 0. MADRM = 32.</td></tr>
+</table></div>
+
+<div class="case drop" id="cD5"><h3>D5: hash {mDNS, all-hosts}: send all-routers <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000004 (HMC [2]). HT1R = 0x00010001 (bit 48 → bit 16, bit 32 → bit 0), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 01 00 5E 00 00 02  00 80 E1 00 00 00  88 B5  46 49 4C 54 0D 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 55</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>Hash 55, bit not set → dropped.</td></tr>
+</table></div>
+
+<div class="case" id="cD6"><h3>D6: hash: ..:00:18 LEAKS THROUGH (same hash as all-hosts) <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000004 (HMC [2]). HT1R = 0x00010001 (bit 48 → bit 16, bit 32 → bit 0), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 01 00 5E 00 00 18  00 80 E1 00 00 00  88 B5  46 49 4C 54 0E 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 32</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 1, MADRM = 32, DAF = 0, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>A different address but the same bit 32 → passes. "Imperfect filtering": software has to filter again.</td></tr>
+</table></div>
+
+<div class="case" id="cD7"><h3>D7: hash: ..:00:C9 LEAKS THROUGH (same hash as mDNS) <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000004 (HMC [2]). HT1R = 0x00010001 (bit 48 → bit 16, bit 32 → bit 0), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 01 00 5E 00 00 C9  00 80 E1 00 00 00  88 B5  46 49 4C 54 0F 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 48</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 1, MADRM = 48, DAF = 0, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>Same bit 48 as mDNS → passes.</td></tr>
+</table></div>
+
+<div class="case drop" id="cD8"><h3>D8: hash: send IPv6 33:33:00:00:00:01 <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000004 (HMC [2]). HT1R = 0x00010001 (bit 48 → bit 16, bit 32 → bit 0), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 33 33 00 00 00 01  00 80 E1 00 00 00  88 B5  46 49 4C 54 10 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 1</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>Hash 1, bit not set → dropped. IPv6 multicast goes through the hash table just like IPv4.</td></tr>
+</table></div>
+
+<h3>E. Hash for unicast, and HPF</h3>
+<div class="case" id="cE1"><h3>E1: HUC = 1, hash {PEER}: send PEER <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000002 (HUC [1]). HT1R = 0x00000004 (bit 34 → bit 2), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 6C 1F F7 CA 2B FD  00 80 E1 00 00 00  88 B5  46 49 4C 54 11 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 34</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 1, MADRM = 34, DAF = 0, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>Unicast via the hash: bit 34 = HT1R bit 2. HF = 1, MADRM = 34.</td></tr>
+</table></div>
+
+<div class="case drop" id="cE2"><h3>E2: HUC = 1, HPF = 0: send board (hash only) <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000002 (HUC [1]). HT1R = 0x00000004 (bit 34 → bit 2), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 00  00 80 E1 00 00 00  88 B5  46 49 4C 54 12 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 13</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>p.3119 HPF = 0 with HUC = 1: only the hash is consulted and MACA0 is ignored → <b>the primary address is dropped</b>.</td></tr>
+</table></div>
+
+<div class="case" id="cE3"><h3>E3: HUC = 1, HPF = 1: send board (hash OR perfect) <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000402 (HUC [1], HPF [10]). HT1R = 0x00000004 (bit 34 → bit 2), HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 00  00 80 E1 00 00 00  88 B5  46 49 4C 54 13 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 13</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>HPF: matching either one is enough to pass. RS2V = 0 (slot 0 match).</td></tr>
+</table></div>
+
+<h3>F. DAIF: invert the DA result</h3>
+<div class="case drop" id="cF1"><h3>F1: DAIF = 1: DA = board → dropped <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000008 (DAIF [3]). HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 00  00 80 E1 00 00 00  88 B5  46 49 4C 54 14 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 13</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>The DA comparison result is inverted: match → fail.</td></tr>
+</table></div>
+
+<div class="case" id="cF2"><h3>F2: DAIF = 1: unknown DA → passes <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000008 (DAIF [3]). HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 6C 1F F7 CA 2B FD  00 80 E1 00 00 00  88 B5  46 49 4C 54 15 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 34</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>No match → inverted to pass. RS2V = 0.</td></tr>
+</table></div>
+
+<h3>G. Receive All</h3>
+<div class="case" id="cG1"><h3>G1: RA = 1: unknown DA passes, DAF = 1 <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x80000000 (RA [31]). HT1R = HT0R = 0. MACA1: off.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 6C 1F F7 CA 2B FD  00 80 E1 00 00 00  88 B5  46 49 4C 54 16 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 34</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 1: HF = 0, MADRM = 0, DAF = 1, SAF = 0</td></tr>
+<tr><th style="width:150px">Why</th><td>Receive All: the frame comes up even though it missed, and RDES2.DAF = 1 reports "would have been dropped". The only way to see a miss in a descriptor.</td></tr>
+</table></div>
+
+<h3>H. Filtering by SA: MACA1 with the SA bit</h3>
+<div class="case" id="cH1"><h3>H1: SAF = 1, MACA1(SA) = board: SA = board <span class="tag p">PASS</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000200 (SAF [9]). HT1R = HT0R = 0. MACA1: BOARD, AE | SA.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 00  00 80 E1 00 00 00  88 B5  46 49 4C 54 17 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 13</td></tr>
+<tr><th style="width:150px">Expected / board</th><td><span class="ok">PASS</span>, a 60-byte frame came back. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>Slot 1 compares the SA instead of the DA; the SA matches and the DA matches slot 0 → passes. RS2V = 0 even though slot 1 matched on the SA.</td></tr>
+</table></div>
+
+<div class="case drop" id="cH2"><h3>H2: SAF = 1, MACA1(SA) = board: unknown SA <span class="tag d">DROP</span></h3>
+<table><tr><th style="width:150px">Setup</th><td>ETH_MACPFR = 0x00000200 (SAF [9]). HT1R = HT0R = 0. MACA1: BOARD, AE | SA.</td></tr>
+<tr><th style="width:150px">Frame sent</th><td><pre>TX 22 bytes: 00 80 E1 00 00 00  02 00 00 00 00 99  88 B5  46 49 4C 54 18 00 00 00
+            DA                 SA                type  "FILT" n  pad
+RX 60 bytes: the MAC pads with 38 zero bytes (ACS/CST = 1: FCS dropped, pad kept)</pre>hashDA = 13</td></tr>
+<tr><th style="width:150px">Expected / board</th><td>DROP, nothing came back within 5 ms. Board 2026-10-16 and 10-20: <b>OK</b>. RS2V = 0: columns HF MADRM DAF SAF print "-"</td></tr>
+<tr><th style="width:150px">Why</th><td>SA 02:00:00:00:00:99 does not match slot 1, SAF = 1 → dropped even though the DA is correct.</td></tr>
+</table></div>
+
+
+<h2 id="lessons">8. Lessons from the board</h2>
+<table>
+<tr><th>Date</th><th>Case</th><th>Observed</th><th>Takeaway</th><th>Used in</th></tr>
+<tr><td>2026-10-16</td><td>24/24</td><td>every prediction from tables 549/550 was correct</td><td>RM0399 describes the H755 address filter correctly; you just have to read the tables carefully</td><td>mode 11 was written on top of this</td></tr>
+<tr><td>2026-10-16</td><td>D3 D4 D6 D7 E1</td><td>HF = 1, MADRM = hashDA for all 5 frames</td><td>the formula bitrev(crc32) &gt;&gt; 26 is correct; the hash is imperfect (D6, D7 leak through)</td><td>mode 11's af_hash_index</td></tr>
+<tr><td>2026-10-16</td><td>E2 / E3</td><td>HUC = 1 without HPF: the primary address is dropped; HPF brings it back</td><td>a driver that enables HUC/HMC must enable HPF, otherwise MACA0 is lost</td><td>mode 11 K2 / K3</td></tr>
+<tr><td>2026-10-16</td><td>B1 B4 B5 E3 G1 H1</td><td>RS2V = 1 only at B4 B5 (slot 1), hash, G1 (RA); B1 E3 H1 show "-"</td><td>the MAC writes RDES2 on a slot 1..3 / hash / RA match; not on a slot 0, broadcast, PM or SA match</td><td>mode 11's RS2V column</td></tr>
+<tr><td>2026-10-16</td><td>G1</td><td>RA = 1: a missed frame still comes up with DAF = 1</td><td>the only way to see a "miss" in a descriptor</td><td>mode 11 section 11 (B2)</td></tr>
+<tr><td>2026-10-16</td><td>B5</td><td>MBC masks byte 5 → match, MADRM = 1</td><td>MBC bit 24 + k follows the byte order correctly</td><td>mode 11 G (masks 3 bytes)</td></tr>
+</table>
+
+
+<h2 id="bits">9. Bit table for lookup</h2>
+<table>
+<tr><th>Register / descriptor</th><th>Bit</th><th>In the test</th><th>RM</th></tr>
+<tr><td>ETH_MACPFR</td><td>PR [0] HUC [1] HMC [2] DAIF [3] PM [4] DBF [5] SAF [9] HPF [10] RA [31]</td><td>pfr column</td><td>p.3118-3120</td></tr>
+<tr><td>ETH_MACHT0R / HT1R</td><td>HT31T0 / HT63T32 [31:0]</td><td>hash[]</td><td>p.3121-3122</td></tr>
+<tr><td>ETH_MACA1HR</td><td>AE [31] SA [30] MBC [29:24] ADDRHI [15:0]</td><td>a1, a1_flags</td><td>p.3155</td></tr>
+<tr><td>ETH_MACA1LR</td><td>ADDRLO [31:0]</td><td>a1</td><td>p.3154</td></tr>
+<tr><td>ETH_MACA0HR / LR</td><td>AE reads 1; bytes 5:4 / bytes 3:0</td><td>mac_basic_init</td><td>p.3153-3154</td></tr>
+<tr><td>RDES2 (write-back)</td><td>SAF [16] DAF [17] HF [18] MADRM [26:19]</td><td>columns HF MADRM DAF SAF</td><td>p.3068</td></tr>
+<tr><td>RDES3 (write-back)</td><td>RS2V [27], PL [14:0]</td><td>RS2V decides whether RDES2 is printed</td><td>p.3069</td></tr>
+<tr><td>DA / SA filter table</td><td>Table 549 / 550</td><td>expect column</td><td>p.2956-2957</td></tr>
+</table>
+
+
+<h2 id="todo">10. Cases worth adding (moved to mode 11)</h2>
+<p>What mode 1 did not test has become mode 11 cases: slot 2 for multicast (I), slot 3 comparing the SA (L, M), MBC masking 3 bytes as an OUI filter (G), a slot holding an address but with AE = 0 (H), the PM = 0 control (J2) and DAIF with an unknown DA (N2). Still left for both modes: SAIF (invert SA), PCF (pause / control frames), VTFE combined (address passes, then VLAN drops: mode 8), hash with HMC + HPF, and RA = 1 with SAF = 1 to see RDES2.SAF = 1.</p>
+</main>
+</body>
+</html>

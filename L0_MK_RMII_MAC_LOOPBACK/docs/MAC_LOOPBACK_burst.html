@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DMA burst: FB and AAL</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1d1f;--muted:#5d636b;--line:#cdd0d5;--card:#ffffff;--accent:#0b63c5;--accent-bg:#e2eefb;
+--warn:#a8590a;--warn-bg:#fdf0d0;--ok:#157a3b;--ok-bg:#e0f3e6;--bad:#b3261e;--bad-bg:#fbe4e2;--code:#f0f1f3;--g:#6b3fb3;--g-bg:#efe8fb;--t:#0f766e;--t-bg:#dcf2ef}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:60px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:6px;align-items:center;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:13.5px;flex-wrap:wrap}
+.top .brand{font-weight:700;margin-right:12px;white-space:nowrap}
+.top a{padding:4px 12px;border-radius:99px;text-decoration:none;color:var(--fg);border:1px solid var(--line);white-space:nowrap}
+.top a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 80px;min-width:0}
+h1{font-size:28px;margin:0 0 6px;line-height:1.25}
+h2{font-size:21px;margin:48px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:26px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:15.5px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+.case{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:12px 18px;margin:18px 0}
+.case.drop{border-left-color:var(--bad)}
+.case h3{margin:4px 0 8px}
+.case pre{margin:4px 0;font-size:12.5px;line-height:1.4}
+.case .tag{display:inline-block;font-size:12.5px;padding:1px 9px;border-radius:99px;border:1px solid var(--line);margin-left:8px;vertical-align:middle;font-weight:500}
+.case .tag.p{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.case .tag.d{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.tip{border-left:4px solid var(--ok);background:var(--ok-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.warn{border-left:4px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.mem{border-left:4px solid var(--g);background:var(--g-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:15.5px}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.5;margin:10px 0}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-bg)}
+td.c{text-align:center}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.toc{columns:2;column-gap:28px;font-size:14px}
+.toc a{text-decoration:none}
+svg{width:100%;height:auto;display:block;margin:12px 0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+svg text{fill:var(--fg);font-size:13px}
+svg .m{fill:var(--muted);font-size:12px}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+svg .b{font-weight:700}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .reg{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.4}
+svg .mac{fill:var(--t-bg);stroke:var(--t);stroke-width:1.4}
+svg .okb{fill:var(--ok-bg);stroke:var(--ok);stroke-width:1.4}
+svg .badb{fill:var(--bad-bg);stroke:var(--bad);stroke-width:1.4}
+svg .byt{fill:var(--code);stroke:var(--line);stroke-width:1}
+svg .s{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1}
+svg .cc{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1}
+svg .ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+svg .ln2{stroke:var(--muted);stroke-width:1.1;fill:none;stroke-dasharray:4 3}
+@media (max-width:600px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="top"><span class="brand">MAC loopback</span>
+<a href="MAC_LOOPBACK_filter.html">Table filter (mode 1)</a><a class="on" href="#">DMA burst (mode 2)</a><a href="MAC_LOOPBACK_ptp.html">PTP (mode 3)</a><a href="MAC_LOOPBACK_vlan_tag.html">VLAN tag (mode 4, 5)</a><a href="MAC_LOOPBACK_tso.html">TSO (mode 6)</a><a href="MAC_LOOPBACK_coe.html">Checksum (mode 7)</a><a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a><a href="MAC_LOOPBACK_sa_cpc.html">SA / CRC (mode 10)</a><a href="MAC_LOOPBACK_addr_filter.html">Address filter (mode 11)</a><a href="MAC_LOOPBACK_istat.html">Interrupts: status (mode 12)</a></div>
+<main>
+<h1>DMA burst: mode 2, each setting, each length</h1>
+<p class="lead">Cheat sheet for <code>eth_run_test_ops = 2</code> (<code>eth_mac_burst_lb</code>, file <code>eth_burst_functions.c</code>). STM32H755, RM0399 Rev 4, Synopsys DWC EQoS databook 5.50a. Mode 2 <b>has no board log in the repo yet</b> (folder <code>CM7/Core/Src/log</code> has no "DMA BURST TEST" table): every "after" number below is what the databook predicts; section 7 is waiting for a log. Q&amp;A-style questions about FB / AAL / PBL are already on the <a href="../MAC_LOOPBACK_hoi_dap.html">Q&amp;A</a> page; this page follows exactly the order in which the code runs.</p>
+
+<div class="mem"><b>Mnemonic:</b> <i>The DMA does not copy byte by byte; it copies 4-byte beats grouped into bursts. FB = 1 forces a burst to be 1, 4, 8 or 16 beats; AAL = 1 forces a burst to start at an address divisible by the burst size. When a frame ends in the middle of a burst, the DMA either shrinks the burst or writes dummy beats: mode 2 fills the buffer with AA to see which one it picks.</i></div>
+
+<div class="card toc">
+<a href="#idea">1. What mode 2 tests</a><br>
+<a href="#sbmr">2. ETH_DMASBMR: FB and AAL</a><br>
+<a href="#modes">3. Four modes, fourteen lengths</a><br>
+<a href="#run">4. How one frame runs</a><br>
+<a href="#log">5. Reading the result table</a><br>
+<a href="#cases">6. The four modes, one at a time</a><br>
+<a href="#lessons">7. Lessons from the board</a><br>
+<a href="#regs">8. Bit table for lookup</a><br>
+<a href="#todo">9. Cases worth adding</a>
+</div>
+
+
+<h2 id="idea">1. What mode 2 tests</h2>
+<p>Every other mode only asks "does the frame come back intact". Mode 2 also asks: <b>how many bytes did the DMA write into RAM</b> for a frame that is <i>len</i> bytes long? In theory exactly PL bytes (RDES3.PL, frame length without FCS). In practice the DMA writes over the 32-bit AHB bus in bursts, and how bursts are formed is decided by ETH_DMASBMR (p.3076): with fixed bursts (FB = 1) the databook says the DMA may write a few extra "dummy" beats to round off the burst (§2.2.1.5, figure 2-11). Those dummy bytes sit <b>after</b> the frame in the buffer; they do not harm the data, but they are the only trace of the burst that software can see.</p>
+<p>How it is measured: before each frame, fill the buffer with 0xAA (the frame payload never uses this value), send, receive, then scan from PL to the end of the buffer for the last byte that is not AA. That distance is the <b>after</b> column.</p>
+<svg viewBox="0 0 960 330" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<text x="12" y="22" class="b">the descriptor's rx_buf (2304 bytes), filled with AA before the frame is sent</text>
+<!-- row of 32 byte boxes, 4 per beat, 16 beats = 64 bytes shown as 2 rows -->
+<g>
+<rect x="12" y="40" width="600" height="34" class="byt"/>
+<text x="20" y="62" class="mono">00 01 02 … received frame (PL bytes: DA SA type payload, no FCS)</text>
+<rect x="612" y="40" width="72" height="34" class="badb"/>
+<text x="618" y="62" class="mono">?? ?? ??</text>
+<rect x="684" y="40" width="264" height="34" class="box"/>
+<text x="700" y="62" class="mono">AA AA AA AA AA AA AA AA AA AA …</text>
+</g>
+<line x1="612" y1="34" x2="612" y2="112" class="ln"/>
+<text x="618" y="96" class="m">frame end = buf + RDES3.PL</text>
+<text x="618" y="110" class="m">(the "frame end" column in the table)</text>
+<path d="M612 124 H684" class="ln" marker-end="url(#a)"/>
+<text x="560" y="140" class="m" text-anchor="end">"after" = number of bytes from PL to the last byte ≠ AA</text>
+<!-- beats -->
+<text x="12" y="178" class="b">32-bit AHB bus: the DMA writes 4-byte "beats", grouped into bursts</text>
+<g class="mono">
+<rect x="12"  y="190" width="56" height="28" class="cc"/><text x="20" y="209">beat 0</text>
+<rect x="68"  y="190" width="56" height="28" class="cc"/><text x="76" y="209">beat 1</text>
+<rect x="124" y="190" width="56" height="28" class="cc"/><text x="132" y="209">beat 2</text>
+<rect x="180" y="190" width="56" height="28" class="cc"/><text x="188" y="209">beat 3</text>
+<rect x="236" y="190" width="56" height="28" class="cc"/><text x="244" y="209">…</text>
+<rect x="292" y="190" width="56" height="28" class="cc"/><text x="300" y="209">beat 13</text>
+<rect x="348" y="190" width="56" height="28" class="s"/><text x="356" y="209">beat 14</text>
+<rect x="404" y="190" width="56" height="28" class="s"/><text x="412" y="209">beat 15</text>
+</g>
+<path d="M12 230 H460" class="ln2"/>
+<text x="12" y="248" class="m">INCR16 = 16 beats × 4 bytes = 64 bytes, starting at an address divisible by 64 when AAL = 1</text>
+<line x1="348" y1="186" x2="348" y2="222" class="ln"/>
+<text x="12" y="268" class="m">Vertical bar = the frame ends here, mid-burst. Beats 14, 15 (yellow) have no data.</text>
+<text x="12" y="284" class="m">FB = 1: does the DMA "fill" beats 14, 15? (databook §2.2.1.5, figure 2-11)</text>
+<text x="12" y="300" class="m">FB = 0: INCR burst of any length, stops as soon as the data runs out</text>
+<rect x="520" y="190" width="420" height="110" class="okb"/>
+<text x="532" y="212" class="b">What the "after" column says</text>
+<text x="532" y="232" class="m">0..3  = the rest of the last 32-bit word (normal)</text>
+<text x="532" y="250" class="m">4..63 = the DMA wrote whole extra beats: the trace of a fixed burst</text>
+<text x="532" y="268" class="m">exactly 4 in every mode = suspect the FCS was not stripped, not a burst</text>
+<text x="532" y="286" class="m">data DIFF = a real error, unrelated to bursts</text>
+<text x="12" y="322" class="m">Loopback inside the MAC has no bus analyser: the test can only see the traces the DMA leaves in RAM, not the real bursts on AHB.</text>
+</svg>
+<div class="warn">Loopback inside the MAC gives no view of the bus: no logic analyser, no burst counter. The test can only prove two things: (1) the data comes back correct in all 4 modes, (2) whether or not the DMA writes extra bytes after PL. It does <b>not</b> measure speed, does not see how long the real bursts are, and does not see the AHB 1 KB boundary. Conclusions about FB/AAL performance must come from the databook, not from this mode.</div>
+
+<h2 id="sbmr">2. ETH_DMASBMR: FB and AAL (p.3076)</h2>
+<table>
+<tr><th>Bit</th><th>Name</th><th>Project value</th><th>Meaning</th></tr>
+<tr><td>[0]</td><td>FB  Fixed Burst Length</td><td>1</td><td>1: the DMA only uses SINGLE, INCR4, INCR8, INCR16 bursts (and never more than PBL). 0: the DMA uses INCR of any length ("undefined length"), stopping when the data runs out</td></tr>
+<tr><td>[12]</td><td>AAL  Address-Aligned Beats</td><td>1</td><td>1: every burst starts at an address divisible by the burst size (INCR16 → address divisible by 64). Only meaningful with FB = 1 or with an AXI bus; with FB = 0 the DMA still aligns the first beat (databook §2.2.1.3)</td></tr>
+<tr><td>[14]</td><td>MB  Mixed Burst</td><td>reads 0</td><td>Allows mixing fixed bursts and INCR. RM0399 marks it reserved/0 on the H755: mode "FB=0" is pure INCR</td></tr>
+<tr><td>[15]</td><td>RB  Rebuild INCRx Burst</td><td>0</td><td>When the bus splits a burst, the DMA rebuilds it as INCRx. Not touched in the test</td></tr>
+</table>
+
+<p>The four burst types on AHB, by size:</p>
+<table>
+<tr><th>Burst</th><th>Beats × 4 bytes</th><th>When the DMA uses it</th></tr>
+<tr><td>SINGLE</td><td>1 × 4 = 4</td><td>1 beat left at the tail, or FB = 1 with the address not aligned yet</td></tr>
+<tr><td>INCR4 / INCR8 / INCR16</td><td>4 / 8 / 16 beat = 16 / 32 / 64 byte</td><td>FB = 1: the largest size ≤ PBL and ≤ the remaining data (and address-aligned if AAL = 1)</td></tr>
+<tr><td>INCR (undefined)</td><td>any, at most PBL beats</td><td>FB = 0: one burst up to PBL or until the data runs out</td></tr>
+</table>
+
+<p>PBL is not in DMASBMR: TXPBL is in ETH_DMACTXCR [21:16] (p.3079), RXPBL in ETH_DMACRXCR [21:16] (p.3081), and ETH_DMACCR.PBLX8 [16] (p.3078) multiplies both by 8. The project sets 8 × 8 = <b>64 beats = 256 bytes</b> per DMA bus request. That is why the length table has 255 / 256 / 257.</p>
+<div class="tip">Write order matters: mac_dma_init() writes ETH_DMASBMR while the DMA is still stopped (ST = SR = 0), following RM §61.9.1 p.3031 (bus mode first, descriptors next, ST/SR last). That is why mode 2 resets + re-inits for <b>each</b> mode instead of overwriting DMASBMR on the fly.</div>
+
+<h2 id="modes">3. Four modes, fourteen lengths</h2>
+<table>
+<tr><th>#</th><th>BT_MODES[]</th><th>ETH_DMASBMR</th><th>Idea</th></tr>
+<tr><td>M1</td><td>FB=1 AAL=1 (default)</td><td>0x00001001</td><td>the driver's configuration (mac_dma_init). The reference point</td></tr>
+<tr><td>M2</td><td>FB=0 AAL=1</td><td>0x00001000</td><td>drop fixed bursts: after must be ≤ 3</td></tr>
+<tr><td>M3</td><td>FB=1 AAL=0</td><td>0x00000001</td><td>keep fixed bursts, drop address alignment: the burst boundaries shift</td></tr>
+<tr><td>M4</td><td>FB=0 AAL=0</td><td>0x00000000</td><td>completely free</td></tr>
+</table>
+
+<p>The fourteen lengths in BT_LENS[] (bytes, no FCS, ≥ 60 so the MAC does not pad):</p>
+<table>
+<tr><th>len</th><th>Why chosen</th><th>What it asks</th></tr>
+<tr><td>60, 61, 62, 63</td><td>the four end positions inside a 32-bit word (60 is divisible by 4; 61/62/63 leave 1/2/3)</td><td>FB = 0: after = 0 / 3 / 2 / 1? (the rest of the last word)</td></tr>
+<tr><td>64</td><td>divisible by 64; but the buffer is 32 mod 64, so the frame end falls in the middle of a 64-byte block</td><td>does AAL place the burst boundary by address or by byte 0 of the buffer?</td></tr>
+<tr><td>100</td><td>a "normal" length that hits no boundary</td><td>control</td></tr>
+<tr><td>127, 128, 129</td><td>around 32 beats = 2 INCR16 bursts</td><td>the frame ends exactly on a burst boundary, 1 byte short, 1 byte over</td></tr>
+<tr><td>255, 256, 257</td><td>around 64 beats = one bus request (PBL 8 × PBLX8)</td><td>does the DMA request the bus a second time for 1 extra byte? how does after change</td></tr>
+<tr><td>1001</td><td>odd, long, many bursts</td><td>does after depend on how many bursts have run (it should not)</td></tr>
+<tr><td>1514</td><td>largest Ethernet frame without VLAN</td><td>practical limit; still < 2044 (watchdog WTO = 0 cuts at 2048, ETH_MACWTR p.3120)</td></tr>
+</table>
+
+
+<h2 id="run">4. How one frame runs</h2>
+<svg viewBox="0 0 960 150" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<rect x="8" y="30" width="150" height="54" class="reg"/><text x="16" y="52" class="b">1. reset + init</text><text x="16" y="70" class="m">ETH_DMASBMR = mode</text>
+<path d="M158 57 H190" class="ln" marker-end="url(#a)"/>
+<rect x="192" y="30" width="150" height="54" class="box"/><text x="200" y="52" class="b">2. fill with AA</text><text x="200" y="70" class="m">next rx_buf, DSB</text>
+<path d="M342 57 H374" class="ln" marker-end="url(#a)"/>
+<rect x="376" y="30" width="150" height="54" class="mac"/><text x="384" y="52" class="b">3. send len bytes</text><text x="384" y="70" class="m">egress_packet</text>
+<path d="M526 57 H558" class="ln" marker-end="url(#a)"/>
+<rect x="560" y="30" width="150" height="54" class="mac"/><text x="568" y="52" class="b">4. receive, compare</text><text x="568" y="70" class="m">RDES3.PL, SAME/DIFF</text>
+<path d="M710 57 H742" class="ln" marker-end="url(#a)"/>
+<rect x="744" y="30" width="200" height="54" class="okb"/><text x="752" y="52" class="b">5. scan after PL</text><text x="752" y="70" class="m">last byte ≠ AA → "after"</text>
+<text x="8" y="120" class="m">Step 1 is done once per mode (4 times), steps 2..5 repeat for the 14 lengths. The DMA is stopped while DMASBMR is written (order from RM §61.9.1 p.3031).</text>
+<text x="8" y="138" class="m">Step 5 reads the buffer after the descriptor has been handed back to the DMA: safe because no other frame arrives in loopback.</text>
+</svg>
+<table>
+<tr><th>Step</th><th>Function</th><th>What it does</th><th>Register / variable</th></tr>
+<tr><td>1</td><td>burst_mode_init</td><td>eth_reset_mac → mac_init_100m (writes the default DMASBMR) → rewrite ETH_DMASBMR = mode → init_mac_internal_lb → mac_start</td><td>FLOW [5] prints the DMASBMR just written; [4]..[8] once per mode</td></tr>
+<tr><td>2</td><td>burst_run_frame</td><td>read the buffer address of rx_desc[eth_rx_head] from RDES0 (read it BEFORE the DMA overwrites RDES0), memset 0xAA over all 2304 bytes, ETH_DSB()</td><td>rx_desc[].des0, BT_FILL</td></tr>
+<tr><td>3</td><td>egress_packet</td><td>a frame of len bytes: DA | SA | 88 B5 | payload 0x10 + (i mod 0x60): never yields 0xAA</td><td>tx_buf, TDES3</td></tr>
+<tr><td>4</td><td>ingress_packet_status</td><td>wait for the frame, copy it to rxbuf, return RDES3 → PL; compare with the sent frame → SAME / DIFF</td><td>RDES3.PL [14:0]</td></tr>
+<tr><td>5</td><td>burst_run_frame</td><td>scan dma_buf[PL .. 2303]: the last byte ≠ AA gives "after"; keep the first 16 bytes after PL for printing</td><td>after, show[16]</td></tr>
+<tr><td>6</td><td>burst_print_results</td><td>after all 4 modes: 4 tables, Summary, the FB=0 / FB=1 conclusion, MMC of the last mode</td><td></td></tr>
+</table>
+
+<p>Note on step 5: the descriptor has already been handed back to the DMA (OWN = 1) but the buffer has not been overwritten, because no other frame arrives in loopback. A real driver must not read a buffer after handing its descriptor back.</p>
+<p>The PASS condition for the whole test is only <b>data SAME 56/56</b>. The after column is not graded: it is an observation, and Summary compares it with the databook in words.</p>
+
+<h2 id="log">5. Reading the result table</h2>
+<pre>FB=1 AAL=1 (default): ETH_DMASBMR = 0x00001001          ← hypothetical example, not a board log
+   len    PL  frame end   end%64  data | after | first 16 bytes after PL
+    60    60  0x2400541C  28      SAME |     0 | AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA
+    61    61  0x2400541D  29      SAME |     3 | 10 11 12 AA AA AA AA AA AA AA AA AA AA AA AA AA
+    64    64  0x24005420  32      SAME |     0 | AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA
+   129   129  0x24005461  33      SAME |    31 | 5B 5C 5D 5E 5F 60 61 62 63 64 65 66 67 68 69 6A
+
+Summary:
+  FB=1 AAL=1 (default)   data SAME 14/14, max after = 31, frames with after > 3:  5
+  FB=0 AAL=1             data SAME 14/14, max after =  3, frames with after > 3:  0
+  …
+FB=0: OK, never more than the last 32-bit word after PL (INCR burst stops with the data)
+FB=1: placeholder beats after 5 frame(s) (databook 2.2.1.5, Figure 2-11)</pre>
+<table>
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td>len</td><td>bytes handed to egress_packet (no FCS)</td></tr>
+<tr><td>PL</td><td>RDES3.PL written by the DMA: must equal len (CST = 1 strips the FCS). Different from len is an error, not a burst matter</td></tr>
+<tr><td>frame end</td><td>address of the first byte after the frame = buffer + PL</td></tr>
+<tr><td>end%64</td><td>frame end modulo 64: the end position inside a 64-byte block (= 1 INCR16 burst). The project's buffer is 32 mod 64, so len 64 gives end%64 = 32</td></tr>
+<tr><td>data</td><td>SAME = received frame equals sent frame; DIFF = a real error</td></tr>
+<tr><td>after</td><td>number of bytes from PL to the last byte ≠ AA. 0..3: the last word. ≥ 4: the DMA wrote whole extra beats</td></tr>
+<tr><td>first 16 bytes after PL</td><td>for inspection: AA means untouched; any other value was written by the DMA (usually bytes of the frame itself "repeated", or bus garbage)</td></tr>
+</table>
+
+<p>The last two lines of Summary are automatic conclusions: FB=0 "OK" when no FB = 0 mode has after ≥ 4; FB=1 "placeholder beats after N frame(s)" when at least one such frame exists, otherwise "no placeholder beat … exact INCRx/SINGLE".</p>
+
+<h2 id="cases">6. The four modes, one at a time</h2>
+<p>Labelled "assumed" because there is no log yet. Each card gives what the databook predicts and how to read it if the board says otherwise.</p>
+
+<div class="case" id="cM1"><h3>M1: FB = 1, AAL = 1 (driver default) <span class="tag p">assumed</span></h3>
+<table><tr><th style="width:150px">ETH_DMASBMR</th><td><code>0x00001001</code>: FB [0] = 1, AAL [12] = 1</td></tr>
+<tr><th style="width:150px">Bursts the DMA uses</th><td>only SINGLE / INCR4 / INCR8 / INCR16; every burst starts at an address divisible by the burst size (AAL)</td></tr>
+<tr><th style="width:150px">expected after</th><td>0..3 if the DMA picks the right burst size for the tail (§2.3.1 p.81: "INCRx or SINGLE"); or up to the end of the unfinished beat/burst if the DMA fills in dummy beats (§2.2.1.5, figure 2-11)</td></tr>
+<tr><th style="width:150px">Why</th><td>The databook allows both: when the remaining data is less than a burst, the DMA either shrinks the burst size (INCR16 → INCR8 → INCR4 → SINGLE) or runs the whole burst with dummy beats. Only the board can tell which one the H755 picks.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>This is the configuration mac_dma_init() uses for every other mode (eth_functions.c p.3076 in the table). The project's buffers are at address 0x2400_53E0 + n × 2304: 32 mod 64, so with AAL = 1 the first INCR16 burst cannot start right at byte 0 of the buffer: the DMA has to use a smaller burst (INCR8 = 32 bytes) to reach the 64 boundary before running INCR16. The end%64 column shows where the frame ends inside a 64-byte block.</td></tr>
+<tr><th style="width:150px">If it differs from what is expected</th><td>after > 3 at a few lengths, with after + end%64 reaching a 16, 32 or 64 boundary → the DMA padded to round off an INCR4 / 8 / 16 burst. after > 3 at EVERY length, even 60 → re-check the scan (BT_FILL) before drawing conclusions.</td></tr>
+</table></div>
+
+<div class="case" id="cM2"><h3>M2: FB = 0, AAL = 1 <span class="tag p">assumed</span></h3>
+<table><tr><th style="width:150px">ETH_DMASBMR</th><td><code>0x00001000</code>: FB [0] = 0, AAL [12] = 1</td></tr>
+<tr><th style="width:150px">Bursts the DMA uses</th><td>INCR of any length (undefined length); MB reads 0 on the H755 so there is no mixed burst; AAL still aligns the start address</td></tr>
+<tr><th style="width:150px">expected after</th><td>≤ 3 (the rest of the last 32-bit word)</td></tr>
+<tr><th style="width:150px">Why</th><td>An INCR burst ends exactly where the data runs out; no padding needed (§2.2.1.5). Only the last word may be over-written because the bus is 32 bits.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>If M1 gives after > 3 while M2 gives ≤ 3, that difference is the clearest evidence of FB. On the H755's internal AHB bus FB = 0 is usually slightly faster (fewer dummy beats), but ST recommends FB = 1 in the HAL; the project keeps FB = 1 to match the driver.</td></tr>
+<tr><th style="width:150px">If it differs from what is expected</th><td>after > 3 here disagrees with the databook: the code prints "FB=0: … differs from the databook". In that case suspect that ST's DMA does not honour FB = 0, or that something else writes into the buffer (cache! the D-cache must be off for this region, or invalidated).</td></tr>
+</table></div>
+
+<div class="case" id="cM3"><h3>M3: FB = 1, AAL = 0 <span class="tag p">assumed</span></h3>
+<table><tr><th style="width:150px">ETH_DMASBMR</th><td><code>0x00000001</code>: FB [0] = 1, AAL [12] = 0</td></tr>
+<tr><th style="width:150px">Bursts the DMA uses</th><td>SINGLE / INCR4 / 8 / 16, but a burst may start at an address that is not aligned to the burst size</td></tr>
+<tr><th style="width:150px">expected after</th><td>like M1; may differ at lengths 61..63 and in the buffer's first frame</td></tr>
+<tr><th style="width:150px">Why</th><td>Without address alignment an INCR16 burst can start right at byte 0 of the buffer (0x…53E0): the burst boundaries shift by 32 bytes compared with M1, so the "padding" (if any) lands on different lengths.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>Compare M3 with M1 length by length: the same after means AAL has no effect on the trace in RAM (it only changes how bursts are split on the bus). A different after: note which lengths differ; that is where the burst boundaries are.</td></tr>
+<tr><th style="width:150px">If it differs from what is expected</th><td>Databook §2.2.1.3: AAL = 0 can make a burst cross the AHB 1 KB boundary and get split by the bus. Not visible from RAM; noted only.</td></tr>
+</table></div>
+
+<div class="case" id="cM4"><h3>M4: FB = 0, AAL = 0 <span class="tag p">assumed</span></h3>
+<table><tr><th style="width:150px">ETH_DMASBMR</th><td><code>0x00000000</code>: FB [0] = 0, AAL [12] = 0</td></tr>
+<tr><th style="width:150px">Bursts the DMA uses</th><td>INCR of any length, no address alignment: the "freest" configuration</td></tr>
+<tr><th style="width:150px">expected after</th><td>≤ 3, like M2</td></tr>
+<tr><th style="width:150px">Why</th><td>FB = 0 decides after; AAL cannot change the number of bytes the DMA writes, because an INCR burst stops when the data runs out.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>Last mode: the MAC stays in this configuration until another test calls eth_reset_mac() (comment at the top of eth_mac_burst_lb). Running mode 0 right after mode 2 is fine because mode 0 also resets.</td></tr>
+</table></div>
+
+<h2 id="lessons">7. Lessons from the board</h2>
+<p>There is no mode 2 log in the repo yet. When it runs, paste from the line <code>DMA BURST TEST</code> to <code>Burst test finished</code>. Things to look at first:</p>
+<ol>
+<li>Is data SAME 56/56? If not, stop there: bursts cannot corrupt data; the bug is elsewhere (cache, buffer, PL).</li>
+<li>Modes M2 / M4 (FB = 0): is after ≤ 3? Yes → ST's DMA honours FB = 0.</li>
+<li>Mode M1: what is the largest after, at which length, and which boundary (16, 32, 64) does after + end%64 reach → the burst size the DMA left unfinished.</li>
+<li>M1 vs M3 line by line: does AAL shift the boundaries?</li>
+<li>Pattern "after = 4 in every mode, at every length" → suspect the FCS, not bursts.</li>
+</ol>
+<table>
+<tr><th>Date</th><th>Mode / len</th><th>Observed</th><th>Takeaway</th><th>Code change</th></tr>
+<tr><td colspan="5" class="c">waiting for the board (mode 2 has no log in the repo yet)</td></tr>
+</table>
+
+<h2 id="regs">8. Bit table for lookup</h2>
+<table>
+<tr><th>Register / descriptor</th><th>Bit</th><th>Project</th><th>Used in</th><th>RM0399</th></tr>
+<tr><td>ETH_DMASBMR</td><td>FB [0]</td><td>1 (M1, M3) / 0 (M2, M4)</td><td>burst_mode_init</td><td>p.3076</td></tr>
+<tr><td></td><td>AAL [12]</td><td>1 (M1, M2) / 0 (M3, M4)</td><td>burst_mode_init</td><td>p.3076</td></tr>
+<tr><td></td><td>MB [14]</td><td>reads 0</td><td>not present on the H755</td><td>p.3076</td></tr>
+<tr><td></td><td>RB [15]</td><td>0</td><td>not touched</td><td>p.3076</td></tr>
+<tr><td>ETH_DMACTXCR</td><td>TXPBL [21:16]</td><td>8</td><td>mac_dma_init</td><td>p.3079</td></tr>
+<tr><td></td><td>OSF [4]</td><td>1</td><td>mac_dma_init</td><td>p.3079</td></tr>
+<tr><td>ETH_DMACRXCR</td><td>RXPBL [21:16]</td><td>8</td><td>mac_dma_init</td><td>p.3081</td></tr>
+<tr><td></td><td>RBSZ [14:1]</td><td>2304</td><td>mac_dma_init: buffer size, must be divisible by 32 (a multiple of the bus width) and ≤ 0x3FFF</td><td>p.3081</td></tr>
+<tr><td>ETH_DMACCR</td><td>PBLX8 [16]</td><td>1 → 64 beats per bus request</td><td>mac_dma_init</td><td>p.3078</td></tr>
+<tr><td>ETH_MACWTR</td><td>PWE [8], WTO [3:0]</td><td>1, 0 → RX cut at 2048</td><td>mac_basic_init; limits the test's len</td><td>p.3120</td></tr>
+<tr><td>RDES3 (write-back)</td><td>PL [14:0]</td><td>= len</td><td>burst_run_frame: where the scan starts</td><td>p.3069</td></tr>
+<tr><td>RDES0 (read)</td><td>BUF1AP [31:0]</td><td>buffer address</td><td>read before sending (the write-back overwrites it)</td><td>p.3062</td></tr>
+</table>
+
+
+<h2 id="todo">9. Cases worth adding</h2>
+<p>Burst experiments discussed on 2026-11-06 (Q&amp;A page) that have not been written as code yet:</p>
+<table>
+<tr><th>Case</th><th>Try</th><th>Expect / look for</th></tr>
+<tr><td>P1</td><td>PBL = 1, 4, 32 instead of 8 (TXPBL / RXPBL), PBLX8 kept at 1</td><td>data still SAME; does after change with PBL (largest burst = PBL beats)</td></tr>
+<tr><td>P2</td><td>PBLX8 = 0 (burst at most 8 beats = 32 bytes)</td><td>with FB = 1, after never exceeds 31</td></tr>
+<tr><td>O1</td><td>OSF = 0 (ETH_DMACTXCR [4])</td><td>affects TX only: the time between two frames grows; measure with the t = ms column of FLOW</td></tr>
+<tr><td>R1</td><td>RBSZ not divisible by 64 (e.g. 2272 = 71 × 32)</td><td>buffer address no longer 32 mod 64 → end%64 shifts; checks AAL against the real address</td></tr>
+<tr><td>R2</td><td>64-aligned buffer (declare rx_buf aligned(64))</td><td>M1 can start straight away with INCR16; compare after with the current table</td></tr>
+<tr><td>W1</td><td>len 2045..2100 with WTO = 0, then WTO = 1 (3 KB)</td><td>RDES3.RWT = 1 and the frame cut at 2048; with WTO = 1 it passes (already noted in eth_registers.h)</td></tr>
+<tr><td>D1</td><td>the same test with the D-cache on and the buffer region cacheable</td><td>a "phantom" after caused by the 32-byte cache line: shows why descriptors/buffers must be non-cacheable or invalidated</td></tr>
+</table>
+
+</main>
+</body>
+</html>

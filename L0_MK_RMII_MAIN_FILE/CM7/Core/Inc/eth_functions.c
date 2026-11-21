@@ -1,0 +1,1025 @@
+#include <stdio.h>
+#include <string.h>
+#include "eth_functions_utils.h"
+#include "../../baremetal/eqos_hw.h"
+#include "eth_config_test_case.h"
+
+#define RXD3_OWN       (1UL << 31)
+#define RXD3_FD        (1UL << 29)
+#define RXD3_LD        (1UL << 28)
+#define RXD3_RS2V      (1UL << 27)
+
+#define RXD3_LT_MASK   (7UL << 16)
+#define RXD3_LT_TYPE   (1UL << 16)
+#define RXD3_LT_ARP    (3UL << 16)
+
+#define RXD2_ARPNR     (1UL << 10)
+
+
+static void eth_print_fifo_size(const char *name, uint32_t code)
+{
+    /* FIFO size encoding: 128 * 2^code bytes, codes 0..11. */
+    if (code <= 11U)
+        printf("  %s: raw=%lu, %lu bytes\r\n", name,
+               (unsigned long)code, (unsigned long)(128U << code));
+    else
+        printf("  %s: raw=%lu (reserved encoding)\r\n", name, (unsigned long)code);
+}
+
+void eth_print_hw_features(void)
+{
+    /* Read each capability register once. Call after enabling ETH clocks. */
+    const uint32_t hw1 = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_HW_FEATURE1);
+    const uint32_t hw2 = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_HW_FEATURE2);
+    const uint32_t hash = (hw1 & ETH_MACHWF1R_HASHTBLSZ_Msk) >> ETH_MACHWF1R_HASHTBLSZ_Pos;
+    static const char *const hash_sizes[] = {"none", "64 bits", "128 bits", "256 bits"};
+
+    printf("\r\nETH_MACHWF1R [0x120] = 0x%08lX\r\n", (unsigned long)hw1);
+    printf("  L3L4FNUM: %lu L3/L4 filters\r\n",
+           (unsigned long)((hw1 & ETH_MACHWF1R_L3L4FNUM_Msk) >> ETH_MACHWF1R_L3L4FNUM_Pos));
+    printf("  HASHTBLSZ: raw=%lu, %s\r\n", (unsigned long)hash, hash_sizes[hash]);
+    eth_print_fifo_size("TXFIFOSIZE",
+        (hw1 & ETH_MACHWF1R_TXFIFOSIZE_Msk) >> ETH_MACHWF1R_TXFIFOSIZE_Pos);
+    eth_print_fifo_size("RXFIFOSIZE",
+        (hw1 & ETH_MACHWF1R_RXFIFOSIZE_Msk) >> ETH_MACHWF1R_RXFIFOSIZE_Pos);
+
+    printf("ETH_MACHWF2R [0x124] = 0x%08lX\r\n", (unsigned long)hw2);
+    /* All six defined fields; reserved bits are visible only in the raw value.
+     * Queue/channel counts are encoded as count minus one. */
+    const uint32_t txq = (hw2 & ETH_MACHWF2R_TXQCNT_Msk) >> ETH_MACHWF2R_TXQCNT_Pos;
+    const uint32_t rxq = (hw2 & ETH_MACHWF2R_RXQCNT_Msk) >> ETH_MACHWF2R_RXQCNT_Pos;
+    const uint32_t txch = (hw2 & ETH_MACHWF2R_TXCHCNT_Msk) >> ETH_MACHWF2R_TXCHCNT_Pos;
+    const uint32_t rxch = (hw2 & ETH_MACHWF2R_RXCHCNT_Msk) >> ETH_MACHWF2R_RXCHCNT_Pos;
+    printf("  RXQCNT: raw=%lu, %lu MTL receive queues\r\n", (unsigned long)rxq, (unsigned long)(rxq + 1U));
+    printf("  TXQCNT: raw=%lu, %lu MTL transmit queues\r\n", (unsigned long)txq, (unsigned long)(txq + 1U));
+    printf("  RXCHCNT: raw=%lu, %lu DMA receive channels\r\n", (unsigned long)rxch, (unsigned long)(rxch + 1U));
+    printf("  TXCHCNT: raw=%lu, %lu DMA transmit channels\r\n", (unsigned long)txch, (unsigned long)(txch + 1U));
+    printf("  PPSOUTNUM: %lu PPS outputs\r\n",
+           (unsigned long)((hw2 & ETH_MACHWF2R_PPSOUTNUM_Msk) >> ETH_MACHWF2R_PPSOUTNUM_Pos));
+    printf("  AUXSNAPNUM: %lu auxiliary snapshot inputs\r\n\r\n",
+           (unsigned long)((hw2 & ETH_MACHWF2R_AUXSNAPNUM_Msk) >> ETH_MACHWF2R_AUXSNAPNUM_Pos));
+}
+
+uint32_t eth_construct_frame(uint8_t *buffer, size_t capacity,
+                             uint32_t size, const uint8_t dest_mac[6],
+                             const uint8_t src_mac[6], uint16_t ether_type,
+                             const uint8_t *payload_pattern, size_t pattern_size)
+{
+    if (buffer == NULL || dest_mac == NULL || src_mac == NULL ||
+        payload_pattern == NULL || pattern_size == 0U ||
+        size < ETH_TEST_FRAME_MIN_SIZE || size > ETH_TEST_FRAME_MAX_SIZE ||
+        size > capacity || ether_type < 0x0600U) {
+        return 0U;
+    }
+
+    memcpy(buffer, dest_mac, 6U);
+    memcpy(buffer + 6U, src_mac, 6U);
+    buffer[12] = (uint8_t)(ether_type >> 8);
+    buffer[13] = (uint8_t)ether_type;
+    for (uint32_t i = 14U; i < size; ++i) {
+        buffer[i] = payload_pattern[(i - 14U) % pattern_size];
+    }
+    return size;
+}
+
+
+uint32_t eth_construct_vlan_frame(uint8_t *buffer, size_t capacity,
+                                  uint32_t size, const uint8_t dest_mac[6],
+                                  const uint8_t src_mac[6], uint16_t ether_type,
+                                  uint16_t vlan_id, uint8_t pcp, uint8_t dei,
+                                  const uint8_t *payload_pattern, size_t pattern_size)
+{
+    if (buffer == NULL || dest_mac == NULL || src_mac == NULL ||
+        payload_pattern == NULL || pattern_size == 0U ||
+        size < ETH_TEST_FRAME_MIN_SIZE || size > ETH_TEST_VLAN_FRAME_MAX_SIZE ||
+        size > capacity || ether_type < 0x0600U ||
+        vlan_id > 4094U || pcp > 7U || dei > 1U) {
+        return 0U;
+    }
+
+    const uint16_t tci = (uint16_t)(((uint16_t)pcp << 13) |
+                                   ((uint16_t)dei << 12) | vlan_id);
+    memcpy(buffer, dest_mac, 6U);
+    memcpy(buffer + 6U, src_mac, 6U);
+    buffer[12] = 0x81U;
+    buffer[13] = 0x00U;
+    buffer[14] = (uint8_t)(tci >> 8);
+    buffer[15] = (uint8_t)tci;
+    buffer[16] = (uint8_t)(ether_type >> 8);
+    buffer[17] = (uint8_t)ether_type;
+    for (uint32_t i = 18U; i < size; ++i) {
+        buffer[i] = payload_pattern[(i - 18U) % pattern_size];
+    }
+    return size;
+}
+
+void eth_mac_init(){
+    printf("MAC init success");
+}
+
+void eth_dma_init(){
+    printf("DMA init success");
+}
+
+void eth_mtl_init(){
+    printf("MTL init success");
+}
+
+
+
+void eth_dump_rx_status(uint32_t rdes2,
+                        uint32_t rdes3)
+{
+
+
+    printf("RDES2 = 0x%08lX\n", (unsigned long)rdes2);
+    printf("RDES3 = 0x%08lX\n", (unsigned long)rdes3);
+
+    printf("FD  = %lu\n",
+           (unsigned long)((rdes3 >> 29) & 1U));
+    printf("LD  = %lu\n",
+           (unsigned long)((rdes3 >> 28) & 1U));
+    printf("RS2V = %lu\n",
+           (unsigned long)((rdes3 >> 27) & 1U));
+
+    uint32_t lt = rdes3 & RXD3_LT_MASK;
+
+    if (lt == RXD3_LT_ARP)
+    {
+        printf("LT = ARP request (0b011)\n");
+    }
+    else if (lt == RXD3_LT_TYPE)
+    {
+        printf("LT = ordinary type packet (0b001)\n");
+    }
+    else
+    {
+        printf("LT = 0x%lX\n",
+               (unsigned long)(lt >> 16));
+    }
+
+    if ((rdes3 & RXD3_RS2V) != 0U)
+    {
+        if ((rdes2 & RXD2_ARPNR) != 0U)
+        {
+            printf("ARPNR = 1: ARP reply not generated\n");
+        }
+        else
+        {
+            printf("ARPNR = 0: reply-not-generated flag is clear\n");
+        }
+    }
+    else
+    {
+        printf("RDES2 status not valid; do not interpret ARPNR\n");
+    }
+}
+
+
+/* ===================== Generic multi-descriptor RX ===================== */
+
+#define ETH_RX_NEXT_DESC_TIMEOUT_US  1000U  /* max gap between descriptors of one frame */
+
+/* Poll OWN until 0 (RX and TX). On success the DES3 value is returned and
+ * DSB orders the following buffer/status reads. */
+static bool eth_desc_wait_own(const struct eqos_desc *desc, uint32_t timeout_us,
+                              uint32_t *des3)
+{
+    for (uint32_t elapsed = 0U;; ++elapsed) {
+        *des3 = desc->des3;
+        if ((*des3 & EQOS_DES3_OWN) == 0U) {
+            __DSB();
+            return true;
+        }
+        if (elapsed >= timeout_us)
+            return false;
+        eqos_udelay(1U);
+    }
+}
+
+/* Rebuild all four words, publish OWN last, then wake DMA with the tail. */
+static void eth_rx_rearm_desc(struct eqos_desc *desc, uint8_t *buf)
+{
+    desc->des0 = (uint32_t)(uintptr_t)buf;
+    desc->des1 = 0U;
+    desc->des2 = 0U;
+    __DSB();
+    desc->des3 = EQOS_RDES3_OWN | EQOS_RDES3_BUF1V;
+    __DSB();
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_TAIL_PTR,
+                        (uint32_t)(uintptr_t)desc);
+}
+
+/*
+ * eth_rx_frame_receive() - receive one frame of any size into out[].
+ *
+ * How it works:
+ * 1. Copy, then hand the descriptor back to DMA straight away.
+ *    Each descriptor's piece is copied out, then all four words are re-armed,
+ *    the tail pointer is written and rx_head moves forward. The ring is
+ *    refilled while the frame is still arriving, so the frame size is not
+ *    limited by the ring size (EQOS_RX_DESC_COUNT x EQOS_BUF_SIZE).
+ * 2. Length of each piece:
+ *    - every descriptor before the last one is a full buffer
+ *      (EQOS_BUF_SIZE, which must equal the programmed RBSZ);
+ *    - the last descriptor (LD) holds the rest: its PL is the total frame
+ *      length, so its piece is PL minus the bytes already received.
+ * 3. Status: RDES1, RDES2 and RDES3 of the LD descriptor are read before it is
+ *    re-armed and returned in *info. This function does not judge ES, GP, CE,
+ *    RWT or OE; each test interprets them (e.g. GPSLCE expects GP=1 on a frame
+ *    that is otherwise delivered normally).
+ * 4. Two timeouts:
+ *    - first_timeout_us waits for a frame to start; 0 checks once, no wait.
+ *    - ETH_RX_NEXT_DESC_TIMEOUT_US applies between descriptors once a frame
+ *      has started. A frame that stalls part-way returns EQOS_EIO instead of
+ *      EQOS_ETIMEDOUT, so "no frame" and "frame broke off" are distinguished.
+ * 5. Getting back in step after a broken frame:
+ *    - a descriptor without FD while no frame is in progress is the leftover
+ *      end of an abandoned frame: re-armed, counted in desc_dropped, and the
+ *      function keeps waiting;
+ *    - FD in the middle of a frame means the previous frame was cut short:
+ *      assembly restarts at that descriptor;
+ *    - context descriptors (CTXT=1, timestamps) are re-armed and skipped.
+ *    So a stall part-way through a frame never breaks the next call.
+ * 6. Ordering: DSB after reading OWN=0 and before reading the buffer; DSB
+ *    before setting OWN and before the tail write. The descriptor is not
+ *    touched again after OWN is set.
+ * 7. Nothing slow inside the loop (no printf). At 100 Mbps a 1600-byte buffer
+ *    fills in about 128 us; copy + re-arm takes a few us.
+ *
+ * Assumptions: only buffer 1 is used (BUF2V=0); out_size is large enough for
+ * the frame (the size check only prevents a memory overrun, it is not reported).
+ *
+ * Returns EQOS_OK (check info->rdes3 for error bits), EQOS_ETIMEDOUT (no frame
+ * started) or EQOS_EIO (frame stalled part-way).
+ */
+int eth_rx_frame_receive(struct eqos_dev *eth, struct eqos_desc *rx_desc,
+                         uint8_t rx_buf[][EQOS_BUF_SIZE],
+                         uint8_t *out, size_t out_size,
+                         uint32_t first_timeout_us, struct eth_rx_frame *info)
+{
+    uint32_t rx_bytes = 0U;      /* frame bytes received so far */
+    bool in_frame = false;
+    uint32_t timeout = first_timeout_us;
+
+    memset(info, 0, sizeof(*info));
+    while (1) {
+        const uint32_t idx = eth->rx_head;
+        struct eqos_desc *desc = &rx_desc[idx];
+        uint32_t rdes3;
+
+        if (!eth_desc_wait_own(desc, timeout, &rdes3))
+            return in_frame ? EQOS_EIO : EQOS_ETIMEDOUT;
+
+        bool last = false;
+        if ((rdes3 & EQOS_RDES3_WB_CTXT) != 0U) {
+            /* Timestamp context descriptor: not frame data. */
+        } else if (!in_frame && (rdes3 & EQOS_RDES3_WB_FD) == 0U) {
+            ++info->desc_dropped;            /* tail of an abandoned frame */
+        } else {
+            if ((rdes3 & EQOS_RDES3_WB_FD) != 0U) {
+                info->desc_dropped += info->desc_used;  /* FD mid-frame: restart */
+                info->desc_used = 0U;
+                rx_bytes = 0U;
+                in_frame = true;
+            }
+            uint32_t chunk = EQOS_BUF_SIZE;
+            if ((rdes3 & EQOS_RDES3_WB_LD) != 0U) {
+                const uint32_t pl = rdes3 & EQOS_RDES3_WB_PL_MASK;
+                chunk = (pl > rx_bytes) ? pl - rx_bytes : 0U;
+                info->len   = pl;
+                info->rdes0 = desc->des0;       /* read status before re-arm */
+                info->rdes1 = desc->des1;       /* read status before re-arm */
+                info->rdes2 = desc->des2;
+                info->rdes3 = rdes3;
+                last = true;
+            }
+            if (rx_bytes + chunk <= out_size) /* defensive: never overrun */
+                memcpy(out + rx_bytes, rx_buf[idx], chunk);
+            rx_bytes += chunk;
+            ++info->desc_used;
+        }
+
+        eth_rx_rearm_desc(desc, rx_buf[idx]);
+        eth->rx_head = (idx + 1U) & (EQOS_RX_DESC_COUNT - 1U);
+
+        if (last)
+            return EQOS_OK;
+        timeout = in_frame ? ETH_RX_NEXT_DESC_TIMEOUT_US : first_timeout_us;
+    }
+}
+
+
+/* ===================== Generic multi-descriptor TX ===================== */
+
+#define ETH_TX_PIECE_MAX         0x3FFFU  /* B1L field limit (14 bits) */
+#define ETH_TX_DESC_TIMEOUT_US   1000U    /* wait for DMA to free a slot */
+
+/*
+ * eth_tx_frame_send() - send one frame of any size and wait for completion.
+ *
+ * How it works:
+ * 1. Zero copy: each descriptor points straight at a piece of frame[]; no
+ *    tx_buf copy. Safe because the function returns only after the frame is
+ *    sent, so the buffer cannot change under DMA.
+ * 2. Piece size = min(remaining, piece_max). piece_max = 0 uses the 16383-byte
+ *    B1L maximum; a smaller value forces the frame across several descriptors.
+ * 3. Same steps for every piece: wait until the slot is free (OWN=0), fill
+ *    DES0..DES2, DSB, set DES3 with OWN, DSB, move tx_head and write the tail
+ *    pointer. Waiting for a free slot covers both "ring full" and "previous
+ *    frame still sending", so any frame size works with any ring size.
+ * 4. TDES3 bits: FL (total length) in every descriptor, FD + fd_ctrl in the
+ *    first one only (CPC, SAIC, CIC are valid in FD only), LD in the last one.
+ * 5. Status: wait for the LD descriptor, then return its TDES3 write-back
+ *    (ES, JT, FF, LoC, NC, LC, EC, UF, IHE) in *info. The function does not
+ *    judge it; each test interprets the bits.
+ * 6. Trade-off: FD is handed to DMA immediately, so DMA may reach the next slot
+ *    before it is filled and pause (TBU) until the tail write wakes it. With
+ *    TSF=1 this changes nothing; in threshold mode check UF in info->tdes3.
+ * 7. Nothing slow inside the loop (no printf).
+ *
+ * Assumptions: frame[] is in memory the ETH DMA can reach (RAM_D1/D2/D3, not
+ * DTCM); D-cache is off; the MTL mode suits the frame size (TSF=1 needs the
+ * frame to fit in the TX FIFO); only buffer 1 is used.
+ *
+ * Returns EQOS_OK (check info->tdes3 for error bits) or EQOS_ETIMEDOUT (no free
+ * slot, or LD not completed in timeout_us: reset before the next run).
+ */
+int eth_tx_frame_send(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                      const uint8_t *frame, uint32_t len, uint32_t piece_max,
+                      uint32_t fd_ctrl, uint32_t timeout_us,
+                      struct eth_tx_frame *info)
+{
+    uint32_t sent = 0U;
+    uint32_t last_idx = eth->tx_head;
+    uint32_t tdes3;
+
+    if (piece_max == 0U || piece_max > ETH_TX_PIECE_MAX)
+        piece_max = ETH_TX_PIECE_MAX;
+    info->desc_used = 0U;
+    info->tdes3 = 0U;
+
+    while (sent < len) {
+        const uint32_t idx = eth->tx_head;
+        struct eqos_desc *desc = &tx_desc[idx];
+
+        /* Slot must be free: DMA done with it (ring full or previous frame). */
+        if (!eth_desc_wait_own(desc, ETH_TX_DESC_TIMEOUT_US, &tdes3))
+            return EQOS_ETIMEDOUT;
+
+        const uint32_t piece = (len - sent < piece_max) ? len - sent : piece_max;
+        uint32_t des3 = EQOS_TDES3_OWN | (len & EQOS_TDES3_FL_MASK);
+        if (sent == 0U)
+            des3 |= EQOS_TDES3_FD | fd_ctrl;   /* CPC/SAIC/CIC valid in FD only */
+        if (sent + piece == len)
+            des3 |= EQOS_TDES3_LD;
+
+        desc->des0 = (uint32_t)(uintptr_t)(frame + sent);   /* zero copy */
+        desc->des1 = 0U;
+        desc->des2 = piece & EQOS_TDES2_B1L_MASK;
+        __DSB();
+        desc->des3 = des3;                     /* publish OWN last */
+        __DSB();
+        eth->tx_head = (idx + 1U) & (EQOS_TX_DESC_COUNT - 1U);
+        AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR,
+                            (uint32_t)(uintptr_t)&tx_desc[eth->tx_head]);
+
+        last_idx = idx;
+        sent += piece;
+        ++info->desc_used;
+    }
+
+    /* Wait for the LD descriptor, then return its write-back status. */
+    if (!eth_desc_wait_own(&tx_desc[last_idx], timeout_us, &tdes3))
+        return EQOS_ETIMEDOUT;
+    info->tdes3 = tdes3;                       /* ES, JT, UF, LC, EC, IHE ... */
+    return EQOS_OK;
+}
+
+
+/* ===================== RX / TX with timestamp ===================== */
+
+/*
+ * eth_rx_frame_receive_timestamp() - eth_rx_frame_receive() + RX timestamp.
+ * Only for tests that already enabled MAC_Timestamp_Control.TSENA=1 and
+ * TSENALL=1. The timestamp is read only when the LD RDES1.TSA=1: it is in the
+ * next descriptor, a context descriptor (CTXT=1, RDES0 = ns, RDES1 = s). That
+ * descriptor is re-armed and rx_head moves on. All-ones = corrupted.
+ * Result in info->ts_valid / ts_ns / ts_s.
+ */
+int eth_rx_frame_receive_timestamp(struct eqos_dev *eth, struct eqos_desc *rx_desc,
+                                   uint8_t rx_buf[][EQOS_BUF_SIZE],
+                                   uint8_t *out, size_t out_size,
+                                   uint32_t first_timeout_us, struct eth_rx_frame *info)
+{
+    const int ret = eth_rx_frame_receive(eth, rx_desc, rx_buf, out, out_size,
+                                         first_timeout_us, info);
+    if (ret != EQOS_OK || (info->rdes1 & EQOS_RDES1_WB_TSA) == 0U)
+        return ret;                               /* no timestamp for this frame */
+
+    const uint32_t idx = eth->rx_head;
+    struct eqos_desc *ctx = &rx_desc[idx];
+    uint32_t des3;
+    if (eth_desc_wait_own(ctx, ETH_RX_NEXT_DESC_TIMEOUT_US, &des3) &&
+        (des3 & EQOS_RDES3_WB_CTXT) != 0U) {
+        info->ts_ns = ctx->des0;
+        info->ts_s = ctx->des1;
+        info->ts_valid = !(info->ts_ns == 0xFFFFFFFFU && info->ts_s == 0xFFFFFFFFU);
+        eth_rx_rearm_desc(ctx, rx_buf[idx]);
+        eth->rx_head = (idx + 1U) & (EQOS_RX_DESC_COUNT - 1U);
+    }
+    return EQOS_OK;
+}
+
+/*
+ * eth_tx_frame_send_timestamp() - send one frame in ONE descriptor with
+ * TDES2.TTSE=1 and wait for completion. Only for tests that already enabled
+ * MAC_Timestamp_Control.TSENA=1; len <= 16383.
+ * The timestamp is read only when the write-back TDES3.TTSS=1 (the DMA then
+ * replaced TDES0/TDES1: TDES0 = ns, TDES1 = s). Result in info->ts_valid /
+ * ts_ns / ts_s. Returns EQOS_OK (check info->tdes3), EQOS_EINVAL or
+ * EQOS_ETIMEDOUT.
+ */
+int eth_tx_frame_send_timestamp(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                                const uint8_t *frame, uint32_t len, uint32_t timeout_us,
+                                struct eth_tx_frame *info)
+{
+    const uint32_t idx = eth->tx_head;
+    struct eqos_desc *desc = &tx_desc[idx];
+    uint32_t tdes3;
+
+    memset(info, 0, sizeof(*info));
+    if (len == 0U || len > ETH_TX_PIECE_MAX)
+        return EQOS_EINVAL;
+    if (!eth_desc_wait_own(desc, ETH_TX_DESC_TIMEOUT_US, &tdes3))
+        return EQOS_ETIMEDOUT;                     /* slot still owned by DMA */
+
+    desc->des0 = (uint32_t)(uintptr_t)frame;       /* zero copy */
+    desc->des1 = 0U;
+    desc->des2 = (len & EQOS_TDES2_B1L_MASK) | EQOS_TDES2_TTSE;
+    __DSB();
+    desc->des3 = EQOS_TDES3_OWN | EQOS_TDES3_FD | EQOS_TDES3_LD |
+                 (len & EQOS_TDES3_FL_MASK);
+    __DSB();
+    eth->tx_head = (idx + 1U) & (EQOS_TX_DESC_COUNT - 1U);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR,
+                        (uint32_t)(uintptr_t)&tx_desc[eth->tx_head]);
+
+    if (!eth_desc_wait_own(desc, timeout_us, &tdes3))
+        return EQOS_ETIMEDOUT;
+    info->tdes3 = tdes3;
+    info->desc_used = 1U;
+    if ((tdes3 & EQOS_TDES3_WB_TTSS) != 0U) {
+        info->ts_ns = desc->des0;
+        info->ts_s = desc->des1;
+        info->ts_valid = true;
+    }
+    return EQOS_OK;
+}
+
+
+/* ===================== B0-style packet TX / RX (per DMA channel) ===================== */
+
+#define ETH_DMA_CH_STRIDE        0x80U        /* RM: DMA_CH(#i) registers at +0x80*i */
+#define ETH_TX_FL_MAX            0x7FFFU      /* TDES3.FL [14:0] */
+#define ETH_TX_TPL_MASK          0x3FFFFU     /* TDES3.TPL [17:0] (TSE=1) */
+#define ETH_TX_SLOT_TIMEOUT_US   5000U        /* wait for DMA to free a slot (> one 1518 B frame at 10M) */
+#define ETH_TDES2_B2L_SHIFT      16U          /* TDES2.B2L [29:16] */
+#define ETH_TDES2_CTRL_MASK      0xC000C000U  /* IOC [31], TTSE [30], VTIR [15:14] */
+#define ETH_TDES3_CTRL_MASK      0x0FFF0000U  /* CPC, SAIC, THL, TSE, CIC [27:16] */
+
+struct eth_ring {
+    struct eqos_desc *desc;
+    uint8_t (*buf)[EQOS_BUF_SIZE];   /* RX only */
+    uint32_t count;
+    uint32_t head;                   /* next slot to fill (TX) / to read (RX) */
+};
+
+static struct eth_ring tx_ring[ETH_MAX_CH];
+static struct eth_ring rx_ring[ETH_MAX_CH];
+static struct eth_tx_frame last_tx[ETH_MAX_CH];
+static struct eth_rx_frame last_rx[ETH_MAX_CH];
+static uint32_t pkt_tx_timeout_us = ETH_PKT_DEFAULT_TIMEOUT_US;
+static uint32_t pkt_rx_timeout_us = ETH_PKT_DEFAULT_TIMEOUT_US;
+
+static uint32_t eth_ring_next(const struct eth_ring *r, uint32_t idx)
+{
+    return (idx + 1U == r->count) ? 0U : idx + 1U;   /* any ring size, not only 2^n */
+}
+
+static bool eth_ch_valid(int ch)
+{
+    return ch >= 0 && ch < (int)ETH_MAX_CH;
+}
+
+int eth_pkt_ring_init(int ch, struct eqos_desc *tx_desc, uint32_t tx_count,
+                      struct eqos_desc *rx_desc, uint32_t rx_count,
+                      uint8_t rx_buf[][EQOS_BUF_SIZE])
+{
+    if (!eth_ch_valid(ch) || tx_desc == NULL || rx_desc == NULL || rx_buf == NULL ||
+        tx_count < 3U || rx_count < 2U)
+        return ETH_PKT_EINVAL;     /* TX: context + normal + 1 free slot */
+
+    tx_ring[ch] = (struct eth_ring){ .desc = tx_desc, .buf = NULL,
+                                     .count = tx_count, .head = 0U };
+    rx_ring[ch] = (struct eth_ring){ .desc = rx_desc, .buf = rx_buf,
+                                     .count = rx_count, .head = 0U };
+    memset(&last_tx[ch], 0, sizeof(last_tx[ch]));
+    memset(&last_rx[ch], 0, sizeof(last_rx[ch]));
+    return EQOS_OK;
+}
+
+void eth_pkt_set_timeout(uint32_t tx_us, uint32_t rx_us)
+{
+    pkt_tx_timeout_us = tx_us;
+    pkt_rx_timeout_us = rx_us;
+}
+
+const struct eth_tx_frame *eth_pkt_last_tx(int ch)
+{
+    return eth_ch_valid(ch) ? &last_tx[ch] : NULL;
+}
+
+const struct eth_rx_frame *eth_pkt_last_rx(int ch)
+{
+    return eth_ch_valid(ch) ? &last_rx[ch] : NULL;
+}
+
+/*
+ * eth_egress_packet_ex() - send one frame and wait until it is sent.
+ *
+ * 1. Slots: [context (optional)] [normal FD+LD]. One normal descriptor holds
+ *    buffer 1 + buffer 2 (up to 2 x 16383 B), so no multi-descriptor frames.
+ * 2. Both slots must be free (OWN=0) before anything is written.
+ * 3. Order (databook 11.3.2.4: context before the normal descriptor):
+ *    fill all words, normal TDES3 with OWN, then context TDES3 with OWN|CTXT
+ *    LAST, then the tail pointer past the normal slot.
+ * 4. Wait for the normal descriptor, return its TDES3 (and the context TDES3)
+ *    in last_tx[ch]; timestamp when TTSS=1. Status bits are not judged.
+ *
+ * Assumptions: buffers in DMA-reachable RAM, D-cache off, TX DMA of channel ch
+ * already started. Channel ch feeds MTL TxQ ch (to be checked in the databook
+ * for the company chip).
+ * Returns len1 + len2, ETH_PKT_EINVAL or ETH_PKT_ETIMEOUT.
+ */
+int eth_egress_packet_ex(int ch, const struct eth_tx_req *req)
+{
+    if (!eth_ch_valid(ch) || tx_ring[ch].desc == NULL || req == NULL)
+        return ETH_PKT_EINVAL;
+
+    struct eth_ring *r = &tx_ring[ch];
+    struct eth_tx_frame *st = &last_tx[ch];
+    const uint32_t total = req->len1 + req->len2;
+    uint32_t des3;
+
+    memset(st, 0, sizeof(*st));
+    if (req->buf1 == NULL || req->len1 == 0U || req->len1 > ETH_TX_PIECE_MAX ||
+        req->len2 > ETH_TX_PIECE_MAX || ((req->buf2 == NULL) != (req->len2 == 0U)) ||
+        (req->tdes3_len == 0U && total > ETH_TX_FL_MAX))
+        return ETH_PKT_EINVAL;
+
+    const uint32_t ctx_idx = r->head;
+    const uint32_t nd_idx = req->ctx_valid ? eth_ring_next(r, ctx_idx) : ctx_idx;
+    struct eqos_desc *cd = &r->desc[ctx_idx];
+    struct eqos_desc *nd = &r->desc[nd_idx];
+
+    /* 2. Both slots free (ring full or previous frame still owned by DMA). */
+    if (!eth_desc_wait_own(cd, ETH_TX_SLOT_TIMEOUT_US, &des3) ||
+        !eth_desc_wait_own(nd, ETH_TX_SLOT_TIMEOUT_US, &des3))
+        return ETH_PKT_ETIMEOUT;
+
+    /* 3. Fill, publish normal OWN, then context OWN last. */
+    const uint32_t len_field = (req->tdes3_len != 0U) ?
+                               (req->tdes3_len & ETH_TX_TPL_MASK) :
+                               (total & EQOS_TDES3_FL_MASK);
+    nd->des0 = (uint32_t)(uintptr_t)req->buf1;                      /* zero copy */
+    nd->des1 = (uint32_t)(uintptr_t)req->buf2;                      /* 0 if unused */
+    nd->des2 = (req->len1 & EQOS_TDES2_B1L_MASK) |
+               ((req->len2 & ETH_TX_PIECE_MAX) << ETH_TDES2_B2L_SHIFT) |
+               (req->fd_tdes2 & ETH_TDES2_CTRL_MASK);
+    if (req->ctx_valid) {
+        cd->des0 = req->ctx_tdes[0];
+        cd->des1 = req->ctx_tdes[1];
+        cd->des2 = req->ctx_tdes[2];
+    }
+    __DSB();
+    nd->des3 = EQOS_TDES3_OWN | EQOS_TDES3_FD | EQOS_TDES3_LD |
+               (req->fd_tdes3 & ETH_TDES3_CTRL_MASK) | len_field;
+    if (req->ctx_valid) {
+        __DSB();
+        cd->des3 = (req->ctx_tdes3 & ~(EQOS_TDES3_OWN | EQOS_TDES3_CTXT)) |
+                   EQOS_TDES3_OWN | EQOS_TDES3_CTXT;              /* OWN last */
+    }
+    __DSB();
+    r->head = eth_ring_next(r, nd_idx);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE,
+                        EQOS_DMA_CH0_TXDESC_TAIL_PTR + (uint32_t)ch * ETH_DMA_CH_STRIDE,
+                        (uint32_t)(uintptr_t)&r->desc[r->head]);
+    st->desc_used = req->ctx_valid ? 2U : 1U;
+    if (pkt_tx_timeout_us == 0U)
+        return (int)total;          /* pipelined: queued, no completion wait, no status */
+
+    /* 4. Wait for completion, collect status. */
+    if (!eth_desc_wait_own(nd, pkt_tx_timeout_us, &des3))
+        return ETH_PKT_ETIMEOUT;
+    st->tdes3 = des3;                                  /* ES, JT, UF, LC, EC, IHE ... */
+    if (req->ctx_valid)
+        st->ctx_tdes3 = cd->des3;                      /* OWN=0, CTXT=1 when closed */
+    if ((des3 & EQOS_TDES3_WB_TTSS) != 0U) {
+        st->ts_ns = nd->des0;
+        st->ts_s = nd->des1;
+        st->ts_valid = true;
+    }
+    return (int)total;
+}
+
+/* Wait until DMA has released every TX descriptor of channel ch (end of a
+ * pipelined burst). Returns EQOS_OK, ETH_PKT_EINVAL or ETH_PKT_ETIMEOUT. */
+int eth_egress_flush(int ch, uint32_t timeout_us)
+{
+    if (!eth_ch_valid(ch) || tx_ring[ch].desc == NULL)
+        return ETH_PKT_EINVAL;
+
+    const struct eth_ring *r = &tx_ring[ch];
+    uint32_t des3;
+    for (uint32_t i = 0U; i < r->count; ++i) {
+        if (!eth_desc_wait_own(&r->desc[i], timeout_us, &des3))
+            return ETH_PKT_ETIMEOUT;
+    }
+    return EQOS_OK;
+}
+
+/* B0-style: buffer only. Frames > 16383 B go to buffer 2 of the same descriptor. */
+int eth_egress_packet(int ch, const unsigned char buf[], int len)
+{
+    if (buf == NULL || len <= 0 || (uint32_t)len > 2U * ETH_TX_PIECE_MAX)
+        return ETH_PKT_EINVAL;
+
+    struct eth_tx_req req = {0};
+    req.buf1 = buf;
+    req.len1 = ((uint32_t)len > ETH_TX_PIECE_MAX) ? ETH_TX_PIECE_MAX : (uint32_t)len;
+    if ((uint32_t)len > req.len1) {
+        req.buf2 = buf + req.len1;
+        req.len2 = (uint32_t)len - req.len1;
+    }
+    return eth_egress_packet_ex(ch, &req);
+}
+
+/* Rebuild all four words, publish OWN last, then wake DMA with the tail. */
+static void eth_ring_rx_rearm(int ch, struct eth_ring *r, uint32_t idx)
+{
+    struct eqos_desc *d = &r->desc[idx];
+
+    d->des0 = (uint32_t)(uintptr_t)r->buf[idx];
+    d->des1 = 0U;
+    d->des2 = 0U;
+    __DSB();
+    d->des3 = EQOS_RDES3_OWN | EQOS_RDES3_BUF1V;
+    __DSB();
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE,
+                        EQOS_DMA_CH0_RXDESC_TAIL_PTR + (uint32_t)ch * ETH_DMA_CH_STRIDE,
+                        (uint32_t)(uintptr_t)d);
+}
+
+/*
+ * eth_ingress_packet() - receive one frame of any size from channel ch.
+ *
+ * Same algorithm as eth_rx_frame_receive() (copy, re-arm at once, FD/LD
+ * resync, stray context skipped), plus:
+ * - per-channel ring and tail register;
+ * - frame > blen: the part that fits is copied, the frame is fully consumed
+ *   (ring stays in step) and ETH_PKT_EINVAL is returned;
+ * - RX timestamp read when LD RDES1.TSA=1 (context descriptor after LD).
+ * Status words of the LD descriptor in last_rx[ch], not judged.
+ * Returns the frame length (PL), ETH_PKT_ETIMEOUT, ETH_PKT_EINVAL or ETH_PKT_ESTALL.
+ */
+int eth_ingress_packet(int ch, unsigned char buf[], int blen)
+{
+    if (!eth_ch_valid(ch) || rx_ring[ch].desc == NULL || buf == NULL || blen <= 0)
+        return ETH_PKT_EINVAL;
+
+    struct eth_ring *r = &rx_ring[ch];
+    struct eth_rx_frame *st = &last_rx[ch];
+    const uint32_t size = (uint32_t)blen;
+    uint32_t rx_bytes = 0U;
+    bool in_frame = false;
+    bool too_big = false;
+    uint32_t timeout = pkt_rx_timeout_us;
+
+    memset(st, 0, sizeof(*st));
+    while (1) {
+        const uint32_t idx = r->head;
+        struct eqos_desc *d = &r->desc[idx];
+        uint32_t rdes3;
+
+        if (!eth_desc_wait_own(d, timeout, &rdes3))
+            return in_frame ? ETH_PKT_ESTALL : ETH_PKT_ETIMEOUT;
+
+        bool last = false;
+        if ((rdes3 & EQOS_RDES3_WB_CTXT) != 0U) {
+            /* stray context descriptor: not frame data */
+        } else if (!in_frame && (rdes3 & EQOS_RDES3_WB_FD) == 0U) {
+            ++st->desc_dropped;                       /* tail of an abandoned frame */
+        } else {
+            if ((rdes3 & EQOS_RDES3_WB_FD) != 0U) {
+                st->desc_dropped += st->desc_used;    /* FD mid-frame: restart */
+                st->desc_used = 0U;
+                rx_bytes = 0U;
+                too_big = false;
+                in_frame = true;
+            }
+            uint32_t chunk = EQOS_BUF_SIZE;
+            if ((rdes3 & EQOS_RDES3_WB_LD) != 0U) {
+                const uint32_t pl = rdes3 & EQOS_RDES3_WB_PL_MASK;
+                chunk = (pl > rx_bytes) ? pl - rx_bytes : 0U;
+                st->len   = pl;
+                st->rdes0 = d->des0;                  /* read status before re-arm */
+                st->rdes1 = d->des1;
+                st->rdes2 = d->des2;
+                st->rdes3 = rdes3;
+                last = true;
+            }
+            if (rx_bytes < size) {                    /* copy what fits */
+                const uint32_t room = size - rx_bytes;
+                memcpy(buf + rx_bytes, r->buf[idx], (chunk < room) ? chunk : room);
+            }
+            if (rx_bytes + chunk > size)
+                too_big = true;
+            rx_bytes += chunk;
+            ++st->desc_used;
+        }
+
+        eth_ring_rx_rearm(ch, r, idx);
+        r->head = eth_ring_next(r, idx);
+        if (last)
+            break;
+        timeout = in_frame ? ETH_RX_NEXT_DESC_TIMEOUT_US : pkt_rx_timeout_us;
+    }
+
+    /* RX timestamp: context descriptor right after LD when RDES1.TSA=1. */
+    if ((st->rdes1 & EQOS_RDES1_WB_TSA) != 0U) {
+        const uint32_t idx = r->head;
+        struct eqos_desc *ctx = &r->desc[idx];
+        uint32_t des3;
+        if (eth_desc_wait_own(ctx, ETH_RX_NEXT_DESC_TIMEOUT_US, &des3) &&
+            (des3 & EQOS_RDES3_WB_CTXT) != 0U) {
+            st->ts_ns = ctx->des0;
+            st->ts_s = ctx->des1;
+            st->ts_valid = !(st->ts_ns == 0xFFFFFFFFU && st->ts_s == 0xFFFFFFFFU);
+            eth_ring_rx_rearm(ch, r, idx);
+            r->head = eth_ring_next(r, idx);
+        }
+    }
+    return too_big ? ETH_PKT_EINVAL : (int)st->len;
+}
+
+
+/* ===================== Register update with readback ===================== */
+
+/*
+ * eth_reg_update() - read-modify-write one register, then verify it.
+ * Normally called through ETH_REG_UPDATE(base, offset, clear_mask, set_mask),
+ * which passes the offset macro name as the printed name.
+ *
+ * 1. Read the register once.
+ * 2. Clear clear_mask, set set_mask, write once.
+ * 3. Read back once. Only the bits in (clear_mask | set_mask) are compared, so
+ *    read-only or self-clearing bits elsewhere in the register do not cause a
+ *    false mismatch. To replace a multi-bit field, put the whole field in
+ *    clear_mask and the new value in set_mask.
+ * 4. Print "<name> [address]: old=... write=... readback=... OK/MISMATCH".
+ *
+ * Returns true when the touched bits read back as written. A caller that needs
+ * the old value for a later restore reads the register before calling.
+ */
+bool eth_reg_update(const char *name, uint32_t addr,
+                    uint32_t clear_mask, uint32_t set_mask)
+{
+    const uint32_t old = AX_READ_REG32(addr);
+    const uint32_t value = (old & ~clear_mask) | set_mask;
+    AX_WRITE_REG32(addr, value);
+    const uint32_t rb = AX_READ_REG32(addr);
+    const uint32_t check = clear_mask | set_mask;
+    const bool ok = (rb & check) == (value & check);
+
+    printf("%s [0x%08lX]: old=0x%08lX write=0x%08lX readback=0x%08lX %s\r\n",
+           name, (unsigned long)addr, (unsigned long)old,
+           (unsigned long)value, (unsigned long)rb, ok ? "OK" : "MISMATCH");
+    return ok;
+}
+
+
+/* ===================== MAC address hash index ===================== */
+
+/*
+ * eth_mac_hash_index() - 64-bit hash table index of a MAC address.
+ * Same as Linux stmmac: bitrev32(~crc32_le(~0, addr, 6)) >> 26.
+ * 1. CRC-32 over the 6 address bytes, reflected polynomial 0xEDB88320,
+ *    initial value 0xFFFFFFFF, then invert (the normal Ethernet CRC).
+ * 2. The upper 6 bits of the bit-reversed CRC are its lowest 6 bits in
+ *    reverse order.
+ * Index 0..31 selects ETH_MACHT0R bit idx, 32..63 ETH_MACHT1R bit idx-32.
+ */
+uint32_t eth_mac_hash_index(const uint8_t addr[6])
+{
+    uint32_t crc = 0xFFFFFFFFU;
+    for (uint32_t i = 0U; i < 6U; ++i) {
+        crc ^= addr[i];
+        for (uint32_t bit = 0U; bit < 8U; ++bit)
+            crc = (crc >> 1) ^ ((crc & 1U) ? 0xEDB88320U : 0U);
+    }
+    crc = ~crc;
+
+    uint32_t idx = 0U;
+    for (uint32_t bit = 0U; bit < 6U; ++bit)
+        idx = (idx << 1) | ((crc >> bit) & 1U);
+    return idx;
+}
+
+/* ===================== Bring-up (moved from main.c) ===================== */
+
+/* Software state and DMA rings, shared with the test cases (extern in eth_functions_utils.h).
+ * .eqos_nocache = DMA-accessible RAM_D1, NOLOAD: every word is written by mac_init_100m().
+ * rx_buf is in RAM_D1 (.bss). D-cache must be off (eth_stm32_init), no cache maintenance. */
+struct eqos_dev eth;
+struct eqos_desc tx_desc[EQOS_TX_DESC_COUNT] __attribute__((aligned(32), section(".eqos_nocache")));
+struct eqos_desc rx_desc[EQOS_RX_DESC_COUNT] __attribute__((aligned(32), section(".eqos_nocache")));
+uint8_t rx_buf[EQOS_RX_DESC_COUNT][EQOS_BUF_SIZE] __attribute__((aligned(32)));
+
+/* These checks protect assumptions in the DMA configuration and wrap logic:
+ * index = (index + 1) & (count - 1) requires a nonzero power-of-two ring count.
+ * RBSZ describes each RX buffer's capacity, not the Ethernet MTU or packet size.
+ * A 1600-byte buffer covers an ordinary 1518-byte frame / 1522-byte VLAN frame. */
+_Static_assert(sizeof(struct eqos_desc) == 16, "DMA descriptor stride must be 16 bytes");
+_Static_assert(EQOS_TX_DESC_COUNT > 0 &&
+  (EQOS_TX_DESC_COUNT & (EQOS_TX_DESC_COUNT - 1)) == 0, "TX ring must be power of two");
+_Static_assert(EQOS_RX_DESC_COUNT > 0 &&
+  (EQOS_RX_DESC_COUNT & (EQOS_RX_DESC_COUNT - 1)) == 0, "RX ring must be power of two");
+_Static_assert(EQOS_BUF_SIZE % 32 == 0 && EQOS_BUF_SIZE <= 0x3FFF,
+  "RX buffer must be aligned and fit RBSZ");
+#if !EQOS_STM32H7 || EQOS_DESC_CACHED || EQOS_BUF_CACHED
+#error "This sequence requires STM32H755 with uncached DMA storage"
+#endif
+
+/* Step 3: software state + DMA_Mode.SWR (self-clearing, resets DMA + MTL + MAC),
+ * MAC_1US_Tic_Counter = CSR clock in MHz - 1 (HCLK 224 MHz -> 223), MDIO CR in eth->mdio_cr.
+ *   eth->cfg  base, CSR clock (eth_csr_clock_hz), RMII, MAC address ETH_TEST_SRC_MAC, 100M max
+ *   speed / duplex: mac_init_100m(), loopback: init_mac_internal_lb(), started: mac_start()
+ * Return 1: OK, 0: SWR timeout (no 50 MHz RMII REF_CLK) or CSR clock not supported */
+uint8_t eth_reset_mac(struct eqos_dev *eth)
+{
+    *eth = (struct eqos_dev) {
+        .cfg = {
+            .base = EQOS_BASE_ADDR,
+            .csr_clk_hz = eth_csr_clock_hz(),
+            .phy_iface = EQOS_IFACE_RMII,
+            .mac_addr = ETH_TEST_SRC_MAC,
+            .max_speed = 100,
+            .aneg_timeout_ms = 5000,
+        },
+        .base = EQOS_BASE_ADDR,
+        .desc_stride = sizeof(struct eqos_desc),
+    };
+    uint32_t hz = eth->cfg.csr_clk_hz;
+    uint32_t elapsed = 0;
+
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_MODE,
+        AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_MODE) | EQOS_DMA_MODE_SWR);
+    while ((AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_MODE) & EQOS_DMA_MODE_SWR) != 0U) {
+        if (elapsed++ >= 100000U) {
+            printf("DMA reset timeout: check PA1 50 MHz reference clock\r\n");
+            return 0;
+        }
+        eqos_udelay(1);
+    }
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_US_TIC_COUNTER, hz / 1000000U - 1U);
+
+    if      (hz >= 20000000U  && hz < 35000000U)  eth->mdio_cr = EQOS_MDIO_CR_20_35;
+    else if (hz >= 35000000U  && hz < 60000000U)  eth->mdio_cr = EQOS_MDIO_CR_35_60;
+    else if (hz >= 60000000U  && hz < 100000000U) eth->mdio_cr = EQOS_MDIO_CR_60_100;
+    else if (hz >= 100000000U && hz < 150000000U) eth->mdio_cr = EQOS_MDIO_CR_100_150;
+    else if (hz >= 150000000U && hz < 250000000U) eth->mdio_cr = EQOS_MDIO_CR_150_250;
+    else if (hz >= 250000000U && hz < 300000000U) eth->mdio_cr = EQOS_MDIO_CR_250_300;
+    else {
+        printf("Unsupported MDIO clock: %lu Hz\r\n", (unsigned long)hz);
+        return 0;
+    }
+    return 1;
+}
+
+/* Steps 5 + 7 with the DMA stopped (ST = SR = 0, started later by mac_start()):
+ *   eth->speed / duplex_full  100M full duplex (MAC loopback, PHY not used)
+ *   DMA_CH0_Tx_Control        OSP, TXPBL = 8
+ *   DMA_CH0_Rx_Control        RBSZ = EQOS_BUF_SIZE, RXPBL = 8
+ *   DMA_CH0_Control           PBLX8 (burst 8 x 8 beats)
+ *   DMA_SysBus_Mode           AAL, FB;  DMA_CH0_Interrupt_Enable = 0 (polling)
+ *   TDES / RDES               tx_desc: OWN = 0; rx_desc: rx_buf address, OWN | BUF1V
+ *   DMA_CH0_TxDesc/RxDesc_List_Address, _Ring_Length, _Tail_Pointer
+ *   eth_pkt_ring_init(0)      B0-style eth_egress/ingress_packet() state, default timeouts
+ *   MTL_TxQ0_Operation_Mode   TSF (+ FTQ in half duplex)
+ *   MTL_RxQ0_Operation_Mode   RSF, DIS_TCP_EF
+ *   MAC_Address0_High/Low     eth->cfg.mac_addr
+ *   MAC_Configuration         CST, ACS, FES, DM (LM: init_mac_internal_lb(), TE / RE: mac_start()) */
+void mac_init_100m(struct eqos_dev *eth)
+{
+    uint32_t reg_val;
+
+    eth->speed = EQOS_SPEED_100;
+    eth->duplex_full = true;
+    eth->link_up = true;
+
+    /* DMA */
+    reg_val = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL);
+    reg_val |= EQOS_DMA_CH_TX_OSP | (8U << EQOS_DMA_CH_TX_TXPBL_SHIFT);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL, reg_val);
+
+    reg_val = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL);
+    reg_val &= ~((EQOS_DMA_CH_RX_RBSZ_MASK << EQOS_DMA_CH_RX_RBSZ_SHIFT) |
+                 (EQOS_DMA_CH_RX_RXPBL_MASK << EQOS_DMA_CH_RX_RXPBL_SHIFT) | EQOS_DMA_CH_RX_SR);
+    reg_val |= (EQOS_BUF_SIZE << EQOS_DMA_CH_RX_RBSZ_SHIFT) | (8U << EQOS_DMA_CH_RX_RXPBL_SHIFT);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL, reg_val);
+
+    reg_val = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_CONTROL, reg_val | EQOS_DMA_CH_CTRL_PBLX8);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_SYSBUS_MODE,
+                        EQOS_DMA_SYSBUS_AHB_AAL | EQOS_DMA_SYSBUS_AHB_FB);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_INTERRUPT_ENABLE, 0U);
+
+    /* Descriptors: TX kept by the CPU, RX given to the DMA (OWN | BUF1V written last) */
+    for (uint32_t i = 0; i < EQOS_TX_DESC_COUNT; ++i) {
+        tx_desc[i].des0 = 0;
+        tx_desc[i].des1 = 0;
+        tx_desc[i].des2 = 0;
+        tx_desc[i].des3 = 0;
+    }
+    for (uint32_t i = 0; i < EQOS_RX_DESC_COUNT; ++i) {
+        rx_desc[i].des0 = (uint32_t)(uintptr_t)rx_buf[i];
+        rx_desc[i].des1 = 0;
+        rx_desc[i].des2 = 0;
+        __DSB();
+        rx_desc[i].des3 = EQOS_RDES3_OWN | EQOS_RDES3_BUF1V;
+    }
+    __DSB();
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_LIST_ADDR, (uint32_t)(uintptr_t)&tx_desc[0]);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_RING_LEN, EQOS_TX_DESC_COUNT - 1U);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_LIST_ADDR, (uint32_t)(uintptr_t)&rx_desc[0]);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_RING_LEN, EQOS_RX_DESC_COUNT - 1U);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TXDESC_TAIL_PTR, (uint32_t)(uintptr_t)&tx_desc[0]);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RXDESC_TAIL_PTR,
+                        (uint32_t)(uintptr_t)&rx_desc[EQOS_RX_DESC_COUNT - 1U]);
+    eth->tx_head = 0;
+    eth->rx_head = 0;
+    eth_pkt_ring_init(0, tx_desc, EQOS_TX_DESC_COUNT, rx_desc, EQOS_RX_DESC_COUNT, rx_buf);
+    eth_pkt_set_timeout(ETH_PKT_DEFAULT_TIMEOUT_US, ETH_PKT_DEFAULT_TIMEOUT_US);
+
+    /* MTL */
+    reg_val = AX_BASE_READ_REG32(EQOS_MTL_BASE, EQOS_MTL_TXQ0_OPERATION_MODE) | EQOS_MTL_TXQ_TSF;
+    if (!eth->duplex_full)
+        reg_val |= EQOS_MTL_TXQ_FTQ;
+    AX_BASE_WRITE_REG32(EQOS_MTL_BASE, EQOS_MTL_TXQ0_OPERATION_MODE, reg_val);
+    reg_val = AX_BASE_READ_REG32(EQOS_MTL_BASE, EQOS_MTL_RXQ0_OPERATION_MODE);
+    AX_BASE_WRITE_REG32(EQOS_MTL_BASE, EQOS_MTL_RXQ0_OPERATION_MODE,
+                        reg_val | EQOS_MTL_RXQ_RSF | EQOS_MTL_RXQ_DISTCPEF);
+
+    /* MAC */
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_ADDRESS0_HIGH,
+        ((uint32_t)eth->cfg.mac_addr[5] << 8) | eth->cfg.mac_addr[4]);
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_ADDRESS0_LOW,
+        ((uint32_t)eth->cfg.mac_addr[3] << 24) | ((uint32_t)eth->cfg.mac_addr[2] << 16) |
+        ((uint32_t)eth->cfg.mac_addr[1] << 8) | eth->cfg.mac_addr[0]);
+    reg_val = EQOS_MAC_CFG_CST | EQOS_MAC_CFG_ACS;
+    if (eth->speed == EQOS_SPEED_100)
+        reg_val |= EQOS_MAC_CFG_FES;
+    if (eth->duplex_full)
+        reg_val |= EQOS_MAC_CFG_DM;
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION, reg_val);
+    printf("MAC_Configuration: %08lX\r\n", (unsigned long)reg_val);
+}
+
+/* MAC_Configuration.LM [12] = 1 (read-modify-write): TX goes back to RX inside the MAC */
+void init_mac_internal_lb(struct eqos_dev *eth)
+{
+    uint32_t reg_val = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION, reg_val | EQOS_MAC_CFG_LM);
+    eth->cfg.loopback = true;
+}
+
+/* DMA first (DMA_CH0_Tx_Control.ST, DMA_CH0_Rx_Control.SR), then MAC_Configuration.TE / RE.
+ * Read-modify-write: the other bits keep the values of mac_init_100m(). */
+void mac_start(struct eqos_dev *eth)
+{
+    uint32_t reg_val;
+
+    __DSB();
+    reg_val = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_TX_CONTROL, reg_val | EQOS_DMA_CH_TX_ST);
+    reg_val = AX_BASE_READ_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL);
+    AX_BASE_WRITE_REG32(EQOS_DMA_BASE, EQOS_DMA_CH0_RX_CONTROL, reg_val | EQOS_DMA_CH_RX_SR);
+    reg_val = AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION);
+    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION,
+                        reg_val | EQOS_MAC_CFG_TE | EQOS_MAC_CFG_RE);
+    __DSB();
+    eth->started = true;
+    printf("MAC started: MAC_Configuration %08lX\r\n",
+           (unsigned long)AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_CONFIGURATION));
+}

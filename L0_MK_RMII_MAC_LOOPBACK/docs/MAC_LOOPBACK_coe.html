@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Checksum offload: mode 7 case by case</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1d1f;--muted:#5d636b;--line:#cdd0d5;--card:#ffffff;--accent:#0b63c5;--accent-bg:#e2eefb;
+--warn:#a8590a;--warn-bg:#fdf0d0;--ok:#157a3b;--ok-bg:#e0f3e6;--bad:#b3261e;--bad-bg:#fbe4e2;--code:#f0f1f3;--g:#6b3fb3;--g-bg:#efe8fb;--t:#0f766e;--t-bg:#dcf2ef}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e7e9;--muted:#9aa1aa;--line:#3a3f46;--card:#1d2024;
+--accent:#6aaeff;--accent-bg:#17304d;--warn:#f0b35a;--warn-bg:#3a2d12;--ok:#5fcf86;--ok-bg:#14301d;--bad:#ff8a80;--bad-bg:#3d1a18;--code:#23272c;--g:#b99cf0;--g-bg:#2a2140;--t:#5fd4c8;--t-bg:#12332f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:60px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:6px;align-items:center;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:13.5px;flex-wrap:wrap}
+.top .brand{font-weight:700;margin-right:12px;white-space:nowrap}
+.top a{padding:4px 12px;border-radius:99px;text-decoration:none;color:var(--fg);border:1px solid var(--line);white-space:nowrap}
+.top a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 80px;min-width:0}
+h1{font-size:28px;margin:0 0 6px;line-height:1.25}
+h2{font-size:21px;margin:48px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:26px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);font-size:15.5px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+.case{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:12px 18px;margin:18px 0}
+.case.drop{border-left-color:var(--bad)}
+.case h3{margin:4px 0 8px}
+.case pre{margin:4px 0;font-size:12.5px;line-height:1.4}
+.case .tag{display:inline-block;font-size:12.5px;padding:1px 9px;border-radius:99px;border:1px solid var(--line);margin-left:8px;vertical-align:middle;font-weight:500}
+.case .tag.p{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.case .tag.d{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.tip{border-left:4px solid var(--ok);background:var(--ok-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.warn{border-left:4px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+.mem{border-left:4px solid var(--g);background:var(--g-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:15.5px}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.5;margin:10px 0}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-bg)}
+td.c{text-align:center}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.toc{columns:2;column-gap:28px;font-size:14px}
+.toc a{text-decoration:none}
+svg{width:100%;height:auto;display:block;margin:12px 0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+svg text{fill:var(--fg);font-size:13px}
+svg .m{fill:var(--muted);font-size:12px}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+svg .b{font-weight:700}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .reg{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.4}
+svg .mac{fill:var(--t-bg);stroke:var(--t);stroke-width:1.4}
+svg .okb{fill:var(--ok-bg);stroke:var(--ok);stroke-width:1.4}
+svg .badb{fill:var(--bad-bg);stroke:var(--bad);stroke-width:1.4}
+svg .byt{fill:var(--code);stroke:var(--line);stroke-width:1}
+svg .s{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1}
+svg .cc{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1}
+svg .ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+svg .ln2{stroke:var(--muted);stroke-width:1.1;fill:none;stroke-dasharray:4 3}
+@media (max-width:600px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="top"><span class="brand">MAC loopback</span>
+<a href="MAC_LOOPBACK_filter.html">Table filter (mode 1)</a><a href="MAC_LOOPBACK_burst.html">DMA burst (mode 2)</a><a href="MAC_LOOPBACK_ptp.html">PTP (mode 3)</a><a href="MAC_LOOPBACK_vlan_tag.html">VLAN tag (mode 4, 5)</a><a href="MAC_LOOPBACK_tso.html">TSO (mode 6)</a><a class="on" href="#">Checksum (mode 7)</a><a href="MAC_LOOPBACK_vlan_rx.html">VLAN RX (mode 8, 9)</a><a href="MAC_LOOPBACK_sa_cpc.html">SA / CRC (mode 10)</a><a href="MAC_LOOPBACK_addr_filter.html">Address filter (mode 11)</a><a href="MAC_LOOPBACK_istat.html">Interrupts: status (mode 12)</a></div>
+<main>
+<h1>Checksum offload: the MAC computes and checks IP/TCP/UDP checksums, mode 7 case by case</h1>
+<p class="lead">Cheat sheet for <code>eth_run_test_ops = 7</code> (<code>eth_mac_coe_lb</code>, file <code>eth_coe_functions.c</code>). STM32H755, RM0399 Rev 4, COE §61.5.5 p.2985-2990. Run on the board 3 times (2026-11-08 6/7, 11-09 8/8, 11-10 8/8); section 8 records two lessons the board and the code taught.</p>
+
+<div class="mem"><b>Mnemonic:</b> <i>Transmitter: TDES3.CIC tells the MAC which checksum to insert (00 none, 01 IP, 10 IP + TCP/UDP with the pseudo sum provided by the CPU, 11 the MAC does everything). Receiver: with ETH_MACCR.IPC = 1 the MAC recomputes both and writes the result into RDES1 (IPHE bad header, IPCE bad payload, PT payload type). A bad frame only reaches RAM when DIS_TCP_EF = 1.</i></div>
+
+<div class="card toc">
+<a href="#idea">1. What mode 7 tests</a><br>
+<a href="#frame">2. The test frame and the pseudo header</a><br>
+<a href="#cic">3. TDES3.CIC: four choices at the transmitter</a><br>
+<a href="#rx">4. ETH_MACCR.IPC and RDES1 at the receiver</a><br>
+<a href="#cocase">5. How one case runs (co_case)</a><br>
+<a href="#log">6. Reading the result line</a><br>
+<a href="#cases">7. Eight cases, one at a time</a><br>
+<a href="#lessons">8. Lessons from the board</a><br>
+<a href="#regs">9. Bit table for lookup</a><br>
+<a href="#todo">10. Cases worth adding</a>
+</div>
+
+
+<h2 id="idea">1. What mode 7 tests</h2>
+<p>A TCP/IP stack has to compute two checksums for every outgoing frame: one over the IP header (20 bytes) and one over TCP/UDP (header + payload + a "pseudo header" built from the IP addresses). On a 400 MHz CPU this costs a few microseconds per frame; the MAC has a built-in block that does it instead, called the Checksum Offload Engine (COE). Mode 7 asks three questions: (1) does the transmitter insert the right checksum according to TDES3.CIC, (2) does the receiver correctly detect a bad checksum, (3) do the software and the MAC compute it the same way.</p>
+<p>How it is tested: the same 154-byte TCP/IP frame (G: 142-byte UDP) for every case; only the two checksum fields and CIC change. The frame goes through loopback back to RX. The software re-checks the checksums on the received frame (RFC 1071), then compares with what RDES1 says. Each case has two independent witnesses; it is BAD when either of them is not as expected.</p>
+<svg viewBox="0 0 960 300" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<rect x="10" y="30" width="150" height="70" rx="8" class="box"/><text x="85" y="55" text-anchor="middle" class="b">CPU builds the frame</text>
+<text x="85" y="74" text-anchor="middle" class="m">csum field = 0 / correct /</text><text x="85" y="90" text-anchor="middle" class="m">pseudo header sum</text>
+<path d="M160 65 H200" class="ln" marker-end="url(#a)"/>
+<rect x="200" y="30" width="130" height="70" rx="8" class="reg"/><text x="265" y="55" text-anchor="middle" class="b">TDES3.CIC</text>
+<text x="265" y="74" text-anchor="middle" class="mono">[17:16] p.3052</text><text x="265" y="90" text-anchor="middle" class="m">00 01 10 11</text>
+<path d="M330 65 H370" class="ln" marker-end="url(#a)"/>
+<rect x="370" y="20" width="170" height="90" rx="8" class="mac"/><text x="455" y="45" text-anchor="middle" class="b">TX COE</text>
+<text x="455" y="64" text-anchor="middle" class="m">store-and-forward:</text><text x="455" y="80" text-anchor="middle" class="m">reads the frame, computes,</text><text x="455" y="96" text-anchor="middle" class="m">overwrites the checksum field</text>
+<path d="M540 65 H580" class="ln" marker-end="url(#a)"/>
+<rect x="580" y="30" width="110" height="70" rx="8" class="box"/><text x="635" y="60" text-anchor="middle" class="b">loopback</text><text x="635" y="80" text-anchor="middle" class="m">MACCR.LM</text>
+<path d="M690 65 H730" class="ln" marker-end="url(#a)"/>
+<rect x="730" y="20" width="170" height="90" rx="8" class="mac"/><text x="815" y="45" text-anchor="middle" class="b">RX COE</text>
+<text x="815" y="64" text-anchor="middle" class="m">ETH_MACCR.IPC = 1</text><text x="815" y="80" text-anchor="middle" class="m">recomputes both,</text><text x="815" y="96" text-anchor="middle" class="m">does not modify the frame</text>
+<path d="M815 110 V150" class="ln" marker-end="url(#a)"/>
+<rect x="700" y="150" width="230" height="60" rx="8" class="reg"/><text x="815" y="173" text-anchor="middle" class="b">RDES1 (RS1V = 1) p.3066</text>
+<text x="815" y="193" text-anchor="middle" class="mono">IPV4 PT IPHE IPCE IPCB</text>
+<path d="M635 100 V150" class="ln" marker-end="url(#a)"/>
+<rect x="520" y="150" width="160" height="60" rx="8" class="byt"/><text x="600" y="173" text-anchor="middle" class="b">bytes on the wire</text>
+<text x="600" y="193" text-anchor="middle" class="m">rx_buf, 154 byte</text>
+<path d="M600 210 V250" class="ln" marker-end="url(#a)"/>
+<rect x="470" y="250" width="260" height="40" rx="8" class="okb"/><text x="600" y="275" text-anchor="middle">software re-checks (RFC 1071): ip ok? l4 ok?</text>
+<rect x="20" y="150" width="440" height="140" rx="8" class="cc"/>
+<text x="240" y="175" text-anchor="middle" class="b">Two independent witnesses for each case</text>
+<text x="45" y="200" class="m">1. Wire bytes: did the MAC write the right checksum (TX COE)?</text>
+<text x="45" y="220" class="m">2. RDES1: did the receiving MAC correctly detect bad/good (RX COE)?</text>
+<text x="45" y="245" class="m">A third witness at the transmitter: TDES3 write-back IHE [0], PCE [12] p.3055</text>
+<text x="45" y="265" class="m">= 1 when asked to insert but it could not (not IPv4, odd header...).</text>
+</svg>
+<div class="tip">In the other modes the frame uses the "experimental" EtherType 0x88B5, so the COE leaves it alone. Mode 7 is the first mode that sends a real IPv4 frame (EtherType 0x0800) with standard-conforming IP and TCP headers; otherwise the COE skips it (RDES1.IPCB = 1, "bypassed").</div>
+
+<h2 id="frame">2. The test frame and the pseudo header</h2>
+<p>Built in <code>co_build()</code>, bytes big-endian. The two fields in square brackets are the two checksum fields that <code>co_set_csums()</code> fills in per case: 0, the correct value, or (L4 only) the pseudo header sum.</p>
+<pre>offset   bytes                                            meaning
+[  0.. 13] 6C 1F F7 CA 2B FD  00 80 E1 00 00 00  08 00     DA | SA | EtherType 0800 = IPv4 (the COE only looks at 0800 / 86DD)
+[ 14.. 33] 45 00 00 8C 43 21 40 00 40 06 [cs cs] C0 A8 01 0A C0 A8 01 14
+           ver/IHL=45 TOS total=140 ID=4321 flags=DF TTL=64 proto=06 TCP [24..25] IP csum  src 192.168.1.10  dst 192.168.1.20
+[ 34.. 53] 9C 40 00 50  10 00 00 00  00 00 00 00  50 18 20 00 [cs cs] 00 00
+           sport 40000  dport 80     seq 10000000 ack 0       off=5 PSH|ACK win 8192 [50..51] TCP csum  urg 0
+[ 54..153] 00 01 02 03 ... 63        payload 100 bytes, total 154 bytes
+UDP:       8-byte header [34..41] = 9C 40 00 50 00 6C [cs cs], csum at [40..41], 142-byte frame</pre>
+<p>Correct values for this frame (computed by software, reused in section 7): IP csum = <code>73 DC</code> (TCP) / <code>73 DD</code> (UDP); TCP csum = <code>C3 9B</code>; UDP csum = <code>43 49</code>; fold(TCP pseudo header) = <code>83 ED</code>. The first four values match the "frame received" lines in the 2026-11-09 log exactly.</p>
+<svg viewBox="0 0 960 230" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="currentColor"/></marker></defs>
+<text x="10" y="22" class="b">TCP/UDP checksum = one's complement of the 16-bit sum over: pseudo header (12 bytes, NOT sent) + L4 header + payload</text>
+<rect x="10" y="40" width="300" height="60" rx="6" class="s"/><text x="160" y="62" text-anchor="middle" class="b">pseudo header, 12 byte</text>
+<text x="160" y="82" text-anchor="middle" class="mono">src IP | dst IP | 00 | proto | L4 len</text>
+<rect x="320" y="40" width="200" height="60" rx="6" class="byt"/><text x="420" y="62" text-anchor="middle" class="b">header TCP 20 / UDP 8</text><text x="420" y="82" text-anchor="middle" class="m">checksum field counted as 0</text>
+<rect x="530" y="40" width="200" height="60" rx="6" class="byt"/><text x="630" y="62" text-anchor="middle" class="b">payload 100 byte</text><text x="630" y="82" text-anchor="middle" class="m">odd length: append 00</text>
+<rect x="740" y="40" width="210" height="60" rx="6" class="okb"/><text x="845" y="62" text-anchor="middle" class="b">fold, then ~ (one's complement)</text><text x="845" y="82" text-anchor="middle" class="mono">write into the checksum field</text>
+<text x="10" y="135" class="b">CIC = 10 (case F): CPU and MAC share the work</text>
+<rect x="10" y="150" width="300" height="60" rx="6" class="s"/><text x="160" y="172" text-anchor="middle">CPU: fold(pseudo) = 83 ED</text><text x="160" y="192" text-anchor="middle" class="m">written into the csum field, uncomplemented</text>
+<path d="M310 180 H345" class="ln" marker-end="url(#a)"/>
+<rect x="345" y="150" width="380" height="60" rx="6" class="mac"/><text x="535" y="172" text-anchor="middle">MAC: reads that field as the starting sum, adds header + payload</text><text x="535" y="192" text-anchor="middle" class="m">(checksum field counted as 0), fold, ~, write back</text>
+<path d="M725 180 H760" class="ln" marker-end="url(#a)"/>
+<rect x="760" y="150" width="190" height="60" rx="6" class="okb"/><text x="855" y="172" text-anchor="middle">result = C3 9B</text><text x="855" y="192" text-anchor="middle" class="m">identical to case E</text>
+</svg>
+<p><b>Why there is a pseudo header</b> (RFC 793 for TCP, RFC 768 for UDP): the L4 checksum also covers the source/destination IP addresses and the protocol, even though they are not inside the TCP segment. That way a frame that a router delivers to the wrong machine also has a bad TCP checksum. Consequence for the MAC: to compute the TCP checksum it must read the IP header first, so the COE only runs when the frame is a well-formed IPv4/IPv6 frame (p.2986).</p>
+<p><b>Why CIC = 10 wants the sum uncomplemented</b>: the real checksum = ~fold(sum). With CIC = 10 the MAC does not build the pseudo header itself (p.2987); it takes the value in the checksum field as the starting sum, adds header + payload, folds, and only then complements once. If the CPU writes ~fold(pseudo) there, the MAC adds an already-complemented sum and the result is wrong. Code: <code>CO_SEND_PSEUDO</code> writes <code>csum_fold(csum_pseudo(...))</code> without the ~.</p>
+<div class="warn">Limit, p.2986: the transmitter must hold the whole frame in the TX FIFO before transmitting (store-and-forward) so it knows the sum before the checksum bytes go onto the wire. A frame with CIC ≠ 00 must be smaller than TQS − (PBL + 7) × 4 = 2048 − 60 bytes with this configuration; a 154-byte frame is far below that. For a longer frame the MAC does not insert and reports TDES3.PCE = 1.</div>
+
+<h2 id="cic">3. TDES3.CIC: four choices at the transmitter (p.3052)</h2>
+<table>
+<tr><th>CIC [17:16]</th><th>Name in the code</th><th>MAC inserts</th><th>CPU must do</th><th>Case</th></tr>
+<tr><td>00</td><td>TDES3_CIC_NONE</td><td>nothing, the frame goes out as is</td><td>compute both itself (or send them wrong to test RX)</td><td>A B C H</td></tr>
+<tr><td>01</td><td>TDES3_CIC_IP</td><td>IP header checksum [24..25]</td><td>compute TCP/UDP itself</td><td>D</td></tr>
+<tr><td>10</td><td>TDES3_CIC_IP_PAYLOAD</td><td>IP + TCP/UDP, but the pseudo header sum is supplied by the CPU</td><td>write the uncomplemented fold(pseudo) into the L4 field</td><td>F</td></tr>
+<tr><td>11</td><td>TDES3_CIC_FULL</td><td>IP + TCP/UDP, the MAC builds the pseudo header itself</td><td>leave both fields = 0</td><td>E G (and TSO mode 6 forces it)</td></tr>
+</table>
+
+<p>Only takes effect on the frame's first descriptor (FD = 1) and for IPv4/IPv6 frames. <code>egress_packet()</code> copies the global variable <code>eth_tx_cic</code> into TDES3 [17:16] on every send; at the end of the test it is reset to 0 so other modes do not get unwanted insertion.</p>
+<p><b>What the transmitter reports back</b> (TDES3 write-back, p.3055): IHE [0] = 1 "IP header error": the MAC was asked to insert but the IP header is invalid (not 0800/86DD, unusual IHL, total length larger than the frame). PCE [12] = 1 "payload checksum error": the L4 checksum could not be inserted (protocol not TCP/UDP/ICMP, frame over the store-and-forward limit). In mode 7 both must be 0 in every case with CIC ≠ 00; with CIC = 00 these two bits mean nothing.</p>
+
+<h2 id="rx">4. ETH_MACCR.IPC and RDES1 at the receiver</h2>
+<p>Set one bit: ETH_MACCR.IPC [27] = 1 (p.3112), written before RE = 1. From then on, for every IPv4/IPv6 frame the MAC recomputes the header checksum and the L4 checksum and writes the result into RDES1 of the receive descriptor (p.3066), only meaningful when RDES3.RS1V [26] = 1. The MAC <b>does not modify</b> the frame on receive; it only reports.</p>
+<table>
+<tr><th>RDES1 bit</th><th>Name</th><th>Meaning</th><th>Mode 7 expects</th></tr>
+<tr><td>[2:0]</td><td>PT, payload type</td><td>0 not processed / 1 UDP / 2 TCP / 3 ICMP / 4..7 reserved (IPv6 extension...)</td><td>2 TCP, 1 UDP (G); even when IPHE = 1, board 11-08</td></tr>
+<tr><td>[3]</td><td>IPHE, IP header error</td><td>IP header checksum wrong, or version / IHL / length mismatch</td><td>1 in A, H</td></tr>
+<tr><td>[4]</td><td>IPV4</td><td>the frame is IPv4 (EtherType 0800)</td><td>1 in every case</td></tr>
+<tr><td>[5]</td><td>IPV6</td><td>the frame is IPv6</td><td>0</td></tr>
+<tr><td>[6]</td><td>IPCB, checksum bypassed</td><td>the COE did not check it (not IP, fragment, IPC = 0...)</td><td>0</td></tr>
+<tr><td>[7]</td><td>IPCE, payload checksum error</td><td>TCP/UDP/ICMP checksum wrong</td><td>1 in B, D, H</td></tr>
+</table>
+
+<p><b>Why a bad frame still reaches RAM</b>: the MTL has a switch, ETH_MTLRXQOMR.DIS_TCP_EF [6] (p.3106). = 0 (reset): a frame with IPCE / IPHE is dropped by the MTL, no descriptor, software only sees a counter go up. <code>init_mac_internal_lb()</code> sets it to 1 so the test can see RDES1 of the bad frame. A real driver usually leaves it at 0 to save work.</p>
+<p><b>Does the core have COE</b>: ETH_MACHWF0R (p.3142) TXCOESEL [14] and RXCOESEL [16] read 1 on the H755; the code checks first and stops the test if they are missing (in case of porting to another core).</p>
+
+<h2 id="cocase">5. How one case runs (co_case)</h2>
+<table>
+<tr><th>Step</th><th>What it does</th><th>Function / register</th></tr>
+<tr><td>1</td><td>Build the frame (identical for every case), then fill in the two checksum fields: 0, correct, or pseudo</td><td><code>co_build</code>, <code>co_set_csums</code></td></tr>
+<tr><td>2</td><td>Send with the case's CIC, keep the TDES3 write-back</td><td><code>eth_tx_cic</code> → <code>egress_packet</code>; <code>tx_desc[head−1].des3</code></td></tr>
+<tr><td>3</td><td>Receive, take RDES1 and RDES3</td><td><code>ingress_packet_status</code>, <code>eth_rx_rdes1</code></td></tr>
+<tr><td>4</td><td>On the wire: check the two checksums of the received frame in software, compare the remaining bytes with the sent frame (skipping the 4 checksum bytes)</td><td><code>ip_csum_ok</code>, <code>l4_csum_ok</code>, <code>co_same_but_csums</code></td></tr>
+<tr><td>5</td><td>RDES1: RS1V = 1, IPV4 = 1, IPCB = 0, IPHE / PT / IPCE as expected</td><td></td></tr>
+<tr><td>6</td><td>TDES3: IHE = PCE = 0 if CIC ≠ 00</td><td></td></tr>
+<tr><td>7</td><td>Print the column header + result line + two frame dumps (sent / received); when BAD also print the expectation and the raw RDES1/RDES3/TDES3</td><td></td></tr>
+</table>
+
+<p><b>Expectations are not listed per case but derived from the inputs</b>, so adding a new case is just adding one function-call line:</p>
+<pre>exp_ip  = (CPU wrote a correct IP) OR (CIC >= 01)   → on the wire ip ok?     RDES1.IPHE = !exp_ip
+exp_l4  = (CPU wrote a correct L4) OR (CIC >= 10)   → on the wire l4 ok?     RDES1.IPCE = !exp_l4
+exp_pt  = 2 if protocol 6 (TCP), 1 if 17 (UDP)      (even when IPHE = 1, board 11-08)
+IHE = PCE = 0 when CIC != 00</pre>
+<div class="warn">The flip side (case G, section 8): expectations are derived from the parameters, so a wrong parameter makes the expectation wrong too and the test still prints OK. Read the PT column by eye once after every code change.</div>
+
+<h2 id="log">6. Reading the result line</h2>
+<pre>  id  CIC  IP.sent L4.sent | ip  l4  | IPV4 PT IPHE IPCE IPCB | IHE PCE | result
+  A   00   zero    ok      | BAD ok  | 1    2  1    0    0    | 0   0   | OK      (log 2026-11-10)
+  F   10   zero    pseudo  | ok  ok  | 1    2  0    0    0    | 0   0   | OK</pre>
+<table>
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td>CIC</td><td>the case's TDES3.CIC, two bits</td></tr>
+<tr><td>IP.sent / L4.sent</td><td>what the CPU wrote into the two checksum fields: zero / ok (correct) / pseudo (folded pseudo header)</td></tr>
+<tr><td>ip / l4</td><td>on the wire: the software check of the received frame's checksum: ok / BAD</td></tr>
+<tr><td>IPV4 PT IPHE IPCE IPCB</td><td>RDES1 written by the RX COE (section 4)</td></tr>
+<tr><td>IHE PCE</td><td>the transmitter's TDES3 write-back (section 3)</td></tr>
+<tr><td>result</td><td>OK when all three witnesses are as expected; BAD also prints an expected line and the raw values</td></tr>
+</table>
+
+<p>Under each line are two frame dumps by field (Ethernet / IP hdr / TCP hdr / first 16 payload bytes), with the two checksum fields printed in square brackets: compare bytes [24..25] and [50..51] of "frame sent" with "frame received" to see whether the MAC overwrote them.</p>
+
+<h2 id="cases">7. Eight cases, one at a time</h2>
+<p>Every case: ETH_MACCR.IPC = 1, DIS_TCP_EF = 1, the same 154-byte TCP frame (G: 142-byte UDP). "What the board says" comes from the 2026-11-08 / 09 / 10 logs in <code>CM7/Core/Src/log</code>.</p>
+
+<div class="case drop" id="cA"><h3>A: CIC 00, IP csum = 0, TCP correct <span class="tag d">deliberate error</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>00: no insertion</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 00 00 (wrong), TCP csum = C3 9B (computed correctly by the CPU)</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Leaves the frame alone, sends it as is.</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip BAD, l4 ok. The frame comes back identical to what was sent.</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td>IPV4 = 1, IPHE = 1, <b>PT = 2, IPCE = 0</b>: the header is bad but the MAC still checks TCP.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>2026-11-08: BAD because the code expected PT = 0 (from reading p.3067). Board: PT = 2, IPCE = 0 → expectation fixed. 11-09, 11-10: OK.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>The p.3067 sentence "PT = 0 when the COE does not process the payload because of an IP header error" is about the header structure errors on p.2986 (version, IHL, frame shorter than total length), not about a wrong checksum. The most expensive lesson of this mode.</td></tr>
+</table></div>
+
+<div class="case drop" id="cB"><h3>B: CIC 00, IP correct, TCP csum = 0 <span class="tag d">deliberate error</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>00: no insertion</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 73 DC (correct), TCP csum = 00 00 (wrong)</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Leaves the frame alone.</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip ok, l4 BAD.</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td>IPV4 = 1, PT = 2, IPHE = 0, <b>IPCE = 1</b>.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>11-08, 11-09, 11-10: OK. (The test's opening line used to print 'Case B prints FLOW' while the flag was set on D: changed to D on 2026-11-19.)</td></tr>
+<tr><th style="width:150px">Watch for</th><td>IPCE is the only bit that reports a bad payload. The frame still comes up because DIS_TCP_EF = 1 (section 4); a real driver with DIS_TCP_EF = 0 would have the MTL drop this frame outright.</td></tr>
+</table></div>
+
+<div class="case" id="cC"><h3>C: CIC 00, the CPU computes both <span class="tag p">OK</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>00: no insertion</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 73 DC, TCP csum = C3 9B</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Leaves the frame alone.</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip ok, l4 ok.</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td>IPV4 = 1, PT = 2, IPHE = 0, IPCE = 0, IPCB = 0.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>11-08, 11-09, 11-10: OK.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>The reference case: the software and the MAC agree on how to compute. If C is BAD, csum_add / csum_pseudo in the code are wrong; do not trust any other case.</td></tr>
+</table></div>
+
+<div class="case drop" id="cD"><h3>D: CIC 01, both = 0: the MAC inserts IP only <span class="tag d">deliberate error</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>01: IP header checksum</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 00 00, TCP csum = 00 00</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Computes the checksum over the 20-byte IP header and writes it into [24..25]. Leaves TCP alone.</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip ok (MAC wrote 73 DC), l4 BAD.</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td>IPHE = 0, <b>IPCE = 1</b>, PT = 2. TDES3 write-back IHE = 0.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>11-08, 11-09, 11-10: OK. Case D prints FLOW [10]/[11] in the current code.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>Used when the stack computes TCP itself (rare) or for frames that are not TCP/UDP. The received frame's bytes 24..25 differ from the sent frame: co_same_but_csums skips exactly the 4 checksum bytes when comparing.</td></tr>
+</table></div>
+
+<div class="case" id="cE"><h3>E: CIC 11, both = 0: the MAC inserts everything <span class="tag p">OK</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>11: IP + payload, the MAC computes the pseudo header itself</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 00 00, TCP csum = 00 00</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Computes both the IP checksum and the TCP checksum, including the pseudo header (taking the source/destination IP, protocol and length from the header itself).</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip ok (73 DC), l4 ok (C3 9B).</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td>IPHE = 0, IPCE = 0, PT = 2. IHE = PCE = 0.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>11-08, 11-09, 11-10: OK.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>This is the mode the Linux driver uses for every TCP/UDP frame (and TSO forces it, mode 6). The CPU only has to leave both checksum fields = 0.</td></tr>
+</table></div>
+
+<div class="case" id="cF"><h3>F: CIC 10, TCP = pseudo header sum <span class="tag p">OK</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>10: IP + payload, the CPU provides the pseudo sum</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 00 00, TCP csum = 83 ED = fold(pseudo), NOT complemented</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Adds the TCP header + payload to the value already in the checksum field, takes the one's complement, writes it back. Inserts the IP checksum as in D.</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip ok, l4 ok: the final result is still C3 9B, as in E.</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td>IPHE = 0, IPCE = 0, PT = 2.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>11-08, 11-09, 11-10: OK.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>If the CPU mistakenly writes ~fold(pseudo) (the complemented form, like a real checksum), the MAC adds it wrongly and IPCE = 1. Section 2 explains why it must be left uncomplemented.</td></tr>
+</table></div>
+
+<div class="case" id="cG"><h3>G: CIC 11 with UDP <span class="tag p">OK</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>11</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 00 00, UDP csum = 00 00</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Like E but protocol 17: the pseudo header uses UDP length 108, and the checksum goes into [40..41].</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip ok (73 DD), l4 ok (43 49). Frame 142 byte.</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td><b>PT = 1</b> (UDP), IPHE = 0, IPCE = 0.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>11-09: OK, PT = 1. 11-10: prints PT = 2 yet still OK, because the code at that time passed CO_PROTO_TCP for case G (a source bug, found on 2026-11-19 while writing this page, now fixed to CO_PROTO_UDP). Needs a re-run.</td></tr>
+<tr><th style="width:150px">Watch for</th><td>The expectations in co_case are derived from the proto parameter, so when proto is wrong the expectation is wrong too and the test still says "OK": a test that checks itself against its own inputs cannot catch a wrong function call. Only reading the PT column by eye reveals it.</td></tr>
+</table></div>
+
+<div class="case drop" id="cH"><h3>H: CIC 00, both = 0 <span class="tag d">deliberate error</span></h3>
+<table><tr><th style="width:150px">TDES3.CIC</th><td>00: no insertion</td></tr>
+<tr><th style="width:150px">CPU writes into the frame</th><td>IP csum [24..25] = 00 00, TCP csum = 00 00</td></tr>
+<tr><th style="width:150px">What the MAC does on transmit</th><td>Leaves the frame alone.</td></tr>
+<tr><th style="width:150px">On the wire (software check, RFC 1071)</th><td>ip BAD, l4 BAD.</td></tr>
+<tr><th style="width:150px">Expected RDES1</th><td>IPHE = 1 <b>and</b> IPCE = 1, PT = 2.</td></tr>
+<tr><th style="width:150px">What the board says</th><td>11-09, 11-10: OK (case added after 11-08).</td></tr>
+<tr><th style="width:150px">Watch for</th><td>Reconfirms A: two independent checkers; a bad header does not mask the payload. This is the frame a lazy stack sends when it forgets to enable COE: both ends see the error.</td></tr>
+</table></div>
+
+<h2 id="lessons">8. Lessons from the board</h2>
+<p>Mode 7 is one of the few modes with three runs; each of the three taught something different.</p>
+<table>
+<tr><th>Date</th><th>Case</th><th>Observed</th><th>Takeaway</th><th>Code change</th></tr>
+<tr><td>2026-11-08</td><td>A</td><td>6/7. Expected PT = 0 when IPHE = 1 (from reading p.3067); the board printed PT = 2, IPCE = 0, IPV4 = 1</td><td>The RX COE checks the payload even when the header checksum is wrong; the RM's "PT = 0" sentence is about header structure errors (p.2986), not checksums</td><td>exp_pt always follows the protocol byte; case H added to confirm it (IPHE = 1 and IPCE = 1 at the same time)</td></tr>
+<tr><td>2026-11-09</td><td>A..H</td><td>8/8, G in PT = 1</td><td>all four CIC values, both TCP and UDP; the software and the MAC compute the same way</td><td>no</td></tr>
+<tr><td>2026-11-10</td><td>G</td><td>8/8, but G prints PT = 2, IP total length 0x8C, 154-byte frame: that is a TCP frame</td><td>the source passed CO_PROTO_TCP for case G (a mistake while editing the file); the test derives its expectations from the parameters, so it still says OK. Found on 2026-11-19 while writing this page</td><td>G changed back to CO_PROTO_UDP; needs a re-run, expecting PT = 1 and a 142-byte frame</td></tr>
+</table>
+
+<div class="tip">Two opposite traps: on 11-08 the code followed the RM but the RM was ambiguous, and the board was the referee; on 11-10 the board was right and the test said OK, but the code made the wrong call, and only a human reading the log could see it. That is why each result line prints the raw values too (PT, length), not just OK/BAD.</div>
+
+<h2 id="regs">9. Bit table for lookup</h2>
+<table>
+<tr><th>Register / descriptor</th><th>Bit</th><th>Mode 7 uses</th><th>RM0399</th></tr>
+<tr><td>ETH_MACHWF0R</td><td>TXCOESEL [14], RXCOESEL [16]</td><td>reads 1, otherwise stop</td><td>p.3142</td></tr>
+<tr><td>ETH_MACCR</td><td>IPC [27]</td><td>1, written before RE</td><td>p.3112</td></tr>
+<tr><td>ETH_MTLRXQOMR</td><td>DIS_TCP_EF [6]</td><td>1 (init_mac_internal_lb): keeps frames with checksum errors</td><td>p.3106</td></tr>
+<tr><td>TDES3 (read)</td><td>CIC [17:16]</td><td>00 / 01 / 10 / 11 per case, only on FD = 1</td><td>p.3052</td></tr>
+<tr><td>TDES3 (write-back)</td><td>IHE [0], PCE [12]</td><td>must be 0 when CIC ≠ 00</td><td>p.3055</td></tr>
+<tr><td>RDES1 (write-back)</td><td>PT [2:0], IPHE [3], IPV4 [4], IPV6 [5], IPCB [6], IPCE [7]</td><td>columns IPV4..IPCB; needs RDES3.RS1V [26]</td><td>p.3066-3067</td></tr>
+<tr><td>RDES3 (write-back)</td><td>RS1V [26], PL [14:0]</td><td>RS1V = 1 before reading RDES1</td><td>p.3069</td></tr>
+<tr><td>COE</td><td>§61.5.5, Table 566 (frames not checked: fragment, IP option...)</td><td>store-and-forward limit 2048 − 60</td><td>p.2985-2990</td></tr>
+</table>
+
+
+<h2 id="todo">10. Cases worth adding</h2>
+<table>
+<tr><th>Case</th><th>Try</th><th>Expected</th></tr>
+<tr><td>I6</td><td>frame IPv6 (EtherType 86DD, header 40 byte) + TCP, CIC 11</td><td>RDES1.IPV6 = 1, IPV4 = 0, no IP checksum, TCP still inserted and checked</td></tr>
+<tr><td>IC</td><td>ICMP (protocol 1), CIC 11</td><td>PT = 3, the ICMP checksum (no pseudo header) is inserted</td></tr>
+<tr><td>FR</td><td>IP fragment (flags MF = 1 or offset ≠ 0), CIC 11</td><td>Table 566: the MAC does not check L4 → IPCB = 1 or IPCE per the RM; TX PCE = 1?</td></tr>
+<tr><td>OP</td><td>IP header with options (IHL = 6, 24 bytes)</td><td>IP checksum still correct over 24 bytes; the TCP offset shifts by 4 bytes</td></tr>
+<tr><td>BIG</td><td>frames of 1986 and 1990 bytes with CIC 11 (around TQS − (PBL + 7) × 4 = 1988)</td><td>below: inserted; above: TDES3.PCE = 1, l4 BAD on the wire</td></tr>
+<tr><td>NI</td><td>EtherType 88B5 (not IP) with CIC 11</td><td>the MAC does not insert, IHE = 1? RDES1.IPCB or IPV4 = 0</td></tr>
+<tr><td>DF</td><td>case B with DIS_TCP_EF = 0</td><td>the frame never reaches a descriptor, yet the MMC RX good counter still goes +1 (counted in the MAC before the MTL, as in mode 10)</td></tr>
+</table>
+
+</main>
+</body>
+</html>
