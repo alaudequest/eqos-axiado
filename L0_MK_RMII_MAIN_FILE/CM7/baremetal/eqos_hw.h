@@ -277,6 +277,15 @@
 /* ------------------------------------------------------------------ */
 #define EQOS_DMA_BASE                   (EQOS_BASE_ADDR + 0x1000u)
 
+/* Block bases of one EQoS instance, from eth->base (= EQOS_BASE_ADDR on STM32H755,
+ * set by eth_reset_mac()). New tests use these instead of EQOS_MAC_BASE / EQOS_MTL_BASE /
+ * EQOS_DMA_BASE so the same code runs on any MAC instance of the target chip:
+ *   AX_BASE_READ_REG32(EQOS_MAC_BASE_OF(eth), EQOS_MAC_CONFIGURATION)
+ *   ETH_REG_UPDATE(EQOS_DMA_BASE_OF(eth), EQOS_DMA_MODE, clr, set) */
+#define EQOS_MAC_BASE_OF(eth)           ((eth)->base + (EQOS_MAC_BASE - EQOS_BASE_ADDR))
+#define EQOS_MTL_BASE_OF(eth)           ((eth)->base + (EQOS_MTL_BASE - EQOS_BASE_ADDR))
+#define EQOS_DMA_BASE_OF(eth)           ((eth)->base + (EQOS_DMA_BASE - EQOS_BASE_ADDR))
+
 #define EQOS_DMA_MODE                   0x000u
 #define EQOS_DMA_SYSBUS_MODE            0x004u
 #define EQOS_DMA_DEBUG_STATUS           0x00cu /* absolute offset 0x100C */

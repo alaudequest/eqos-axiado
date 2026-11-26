@@ -7,8 +7,7 @@
 /* MAC_Q0_Tx_Flow_Ctrl (ETH_MACTFCR) pause frame test, measured with the CPU
  * cycle counter (DWT->CYCCNT). Timestamp version: MAC_Q0_TX_FLOW_CTRL_PAUSE_TIMESTAMP.c
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * Path: internal MAC loopback, 100 Mbps full duplex (main.c).
  * 1. TFE=1, PT=pause time; write FCB_BPA=1 -> the MAC sends a pause frame

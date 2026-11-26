@@ -6,8 +6,7 @@
 
 /* MAC_Watchdog_Timeout (ETH_MACWTR) receive watchdog test.
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * PWE=1: a received frame longer than (WTO + 2) x 1024 bytes is cut and
  * reported in RDES3.RWT, MAC_Rx_Tx_Status.RWT and DMA_CH0_Status.RWT.

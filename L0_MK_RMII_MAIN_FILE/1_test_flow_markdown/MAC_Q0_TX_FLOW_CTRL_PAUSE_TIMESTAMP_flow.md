@@ -16,10 +16,17 @@ TX timestamp of a data frame queued during the pause (T1). No printf between T0 
 | RDES1.TSA [14] (last descriptor) | RX timestamp in the next descriptor: context descriptor (RDES3.CTXT [30]=1), RDES0 = ns, RDES1 = s. |
 
 ## Setup
-1. MAC_Sub_Second_Increment.SSINC = 10 (10 ns tick); MAC_Timestamp_Addend = 2^32 × 100 MHz / HCLK.
-2. MAC_Timestamp_Control: TSENA, TSCFUPDT, TSCTRLSSR, TSENALL, TSADDREG = 1; wait 10 µs.
-   Then TSINIT=1; wait 10 µs.
-3. MAC_Rx_Flow_Ctrl.RFE=1; MAC_Packet_Filter.PCF=10 (forward the pause frame to software).
+PTP clock = HCLK (224 MHz on the Nucleo). Order: EQOS databook 18.12.1.
+0. Precondition: HCLK > 100 MHz (fine update needs MAC_Timestamp_Addend < 2^32).
+   Otherwise print `RESULT: FAIL (HCLK <= 100 MHz, fine update not possible)` and stop.
+1. MAC_Timestamp_Control: TSENA=1, TSCTRLSSR=1.
+2. MAC_Sub_Second_Increment.SSINC = 10 (100 MHz tick, 10 ns per tick).
+3. MAC_Timestamp_Addend = 2^32 × 100 MHz / HCLK (224 MHz → 0x7249_2492);
+   TSADDREG=1, poll until 0 (timeout 1 ms).
+4. MAC_Timestamp_Control.TSCFUPDT=1 (fine update), only after the addend is loaded.
+5. MAC_System_Time_Seconds_Update / _Nanoseconds_Update = 0; TSINIT=1, poll until 0 (timeout 1 ms).
+6. MAC_Timestamp_Control.TSENALL=1 (timestamp every RX frame, including the pause frame).
+7. MAC_Rx_Flow_Ctrl.RFE=1; MAC_Packet_Filter.PCF=10 (forward the pause frame to software).
 
 Save MAC_Q0_Tx_Flow_Ctrl, MAC_Rx_Flow_Ctrl, MAC_Packet_Filter, MAC_Timestamp_Control,
 MAC_Sub_Second_Increment; restore at the end (addend not restored).
@@ -45,5 +52,8 @@ the timestamp on HCLK (HSI).
 6. Check T1 − T0 (table). `RESULT: PASS/FAIL` per case, then `N/2 PASS`.
 
 ## Open points
-- TSADDREG / TSINIT use a fixed 10 µs wait instead of polling the self-clearing bits.
-- Board result: PASS; case 1 clock error +0.34 % (HSI).
+- Code (MAC_Q0_TX_FLOW_CTRL_PAUSE_TIMESTAMP.c) still uses the old setup: TSADDREG in the same
+  write as TSENA/TSCFUPDT and a fixed 10 µs wait for TSADDREG / TSINIT. Update it to the Setup above.
+- Same timestamp init as MAC_ISR_TSIS (coarse update there): later move both into one shared
+  init in eth_functions.c (fine/coarse + start time), not coded yet.
+- Board result (old setup): PASS; case 1 clock error +0.34 % (HSI). Rerun after the setup change.

@@ -60,7 +60,7 @@ Release/
 # Only ignore regenerated compiler discovery and personal register-view state.
 **/.settings/language.settings.xml
 **/.settings/com.st.stm32cube.ide.mcu.sfrview.prefs
-
+**/.settings/stm32cubeide.project.prefs
 # ==============================
 # Temporary / backup files
 # ==============================

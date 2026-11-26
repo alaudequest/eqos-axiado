@@ -250,6 +250,11 @@ int eth_test_mac_isr_mmc_tx(struct eqos_dev *eth, struct eqos_desc *tx_desc,
 int eth_test_mtl_rxq0_overflow(struct eqos_dev *eth, struct eqos_desc *tx_desc,
                                struct eqos_desc *rx_desc,
                                uint8_t rx_buf[][EQOS_BUF_SIZE]);
+/* DMA CH0 packet TX/RX test (ID 31): MAC loopback, eth_egress_packet(_ex) / eth_ingress_packet
+ * on CH0, one / two buffers, context descriptor, API guards. Returns failure count, -1 on setup error. */
+int eth_test_dma_ch0_pkt_txrx(struct eqos_dev *eth, struct eqos_desc *tx_desc,
+                              struct eqos_desc *rx_desc,
+                              uint8_t rx_buf[][EQOS_BUF_SIZE]);
 
 /* 64-bit hash table index of a MAC address: CRC-32 (Ethernet polynomial) of
  * the 6 address bytes, then the upper 6 bits of the bit-reversed CRC.

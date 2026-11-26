@@ -7,8 +7,7 @@
 /* MTL_RxQ0 RX FIFO overflow while the RX DMA has no free descriptor, then recovery.
  * Replaces 2_MTL_DMA_test/L1_RMII_MTL_RX_OVERFLOW.c (ID 10, queue runner).
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * MTL_RxQ0_Operation_Mode: RSF=1, EHFC=0 (no flow control), FEP=FUP=0.
  * Frame (512 B): DA=SA=MAC0 | 0x88B5 | sequence number (bytes 14..17) | pattern.

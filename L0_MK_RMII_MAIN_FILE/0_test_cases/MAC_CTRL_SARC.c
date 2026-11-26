@@ -6,8 +6,7 @@
 
 /* ETH_MACCR.SARC[30:28] source address insertion/replacement test.
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * Internal MAC loopback, one case per defined SARC encoding:
  *   010 insert  MAC Address0   TX buffer = DA|Type|Payload      -> RX = DA|MAC0|Type|Payload

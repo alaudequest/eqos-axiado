@@ -8,9 +8,8 @@
  *
  * Checks the B0-style eth_egress_packet*() / eth_ingress_packet() on CH0.
  *
- * main.c includes this file AFTER the TX/RX rings are declared and runs it in
- * the MAC control flow (MACCR.LM=1, 100M full duplex); do not add it as a
- * separate build source.
+ * eth_function_stm32.c includes this file and runs it in the MAC control flow
+ * (MACCR.LM=1, 100M full duplex); do not add it as a separate build source.
  *
  * Every frame: DA = SA = MAC0, EtherType 0x88B5, bytes 14..15 = sequence
  * number (a stale or repeated frame fails the compare).

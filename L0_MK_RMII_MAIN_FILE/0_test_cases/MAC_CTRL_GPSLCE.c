@@ -6,8 +6,7 @@
 
 /* ETH_MACCR.GPSLCE (bit 23) giant packet size limit test.
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * ETH_MACECR.GPSL = 3000. With GPSLCE=1 a received packet longer than GPSL
  * (FCS included, as for the default 1518 limit) is reported as giant in the

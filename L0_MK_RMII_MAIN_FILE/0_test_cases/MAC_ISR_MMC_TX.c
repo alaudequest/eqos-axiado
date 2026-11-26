@@ -7,8 +7,7 @@
 /* MAC_Interrupt_Status.MMCTXIS: MMC TX interrupt, and which read clears TXGPKTIS.
  * Flow: 1_test_flow_markdown/MAC_ISR_MMC_flow.md (TX side only).
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * MMC_Tx_Interrupt.TXGPKTIS sets when Tx_Packet_Count_Good reaches 0x8000_0000.
  *   Databook text : cleared by reading the counter (bits [7:0]).

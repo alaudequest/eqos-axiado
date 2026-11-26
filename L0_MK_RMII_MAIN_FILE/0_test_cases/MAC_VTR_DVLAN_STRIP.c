@@ -7,8 +7,7 @@
 /* ETH_MACVTR double VLAN: inner tag stripping and RDES0 tag status.
  * Flow: MAC_VTR_DVLAN_flow.md.
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * MACVTR: EDVLP=1 ESVL=1 ETV=1 ERIVLT=1 ERSVLM=0 VL=100,
  *         EIVLS=11 (always strip inner), EIVLRXS=1, EVLRXS=1; MACPFR.VTFE=1.

@@ -157,26 +157,29 @@ int eth_test_mac_vir_qinq(struct eqos_dev *eth, struct eqos_desc *tx_desc,
     }
 
     /* ---------- 1. Setup: outer tag from the context (S-VLAN), RX sees two tags ---------- */
-    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, QINQ_MAC_VLAN_INCL, QINQ_VLAN_INCL_VLTI | QINQ_VLAN_INCL_CSVL);
-    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, EQOS_MAC_VLAN_TAG,
+    if (!ETH_REG_UPDATE(EQOS_MAC_BASE, QINQ_MAC_VLAN_INCL, 0xFFFFFFFFU,
+                        QINQ_VLAN_INCL_VLTI | QINQ_VLAN_INCL_CSVL) ||
+        !ETH_REG_UPDATE(EQOS_MAC_BASE, EQOS_MAC_VLAN_TAG, 0xFFFFFFFFU,
                         EQOS_MAC_VLAN_TAG_EVLRXS | QINQ_VLAN_TAG_EDVLP |
-                        QINQ_VLAN_TAG_EIVLRXS | QINQ_VLAN_TAG_ESVL);
+                        QINQ_VLAN_TAG_EIVLRXS | QINQ_VLAN_TAG_ESVL)) {
+        printf("FAIL: QinQ setup readback\r\n");
+        return -1;
+    }
 
     /* ---------- 2. A, B: inner tag decided by the register (VLP = 1, VLC = insert / off) ---------- */
-    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, QINQ_MAC_INNER_VLAN_INCL,
-                        QINQ_VLAN_INCL_VLTI | QINQ_VLAN_INCL_VLP | QINQ_VLAN_INCL_VLC_INSERT);
-    printf("MAC_VLAN_Incl=0x%08lX MAC_Inner_VLAN_Incl=0x%08lX MAC_VLAN_Tag=0x%08lX\r\n",
-           (unsigned long)AX_BASE_READ_REG32(EQOS_MAC_BASE, QINQ_MAC_VLAN_INCL),
-           (unsigned long)AX_BASE_READ_REG32(EQOS_MAC_BASE, QINQ_MAC_INNER_VLAN_INCL),
-           (unsigned long)AX_BASE_READ_REG32(EQOS_MAC_BASE, EQOS_MAC_VLAN_TAG));
+    if (!ETH_REG_UPDATE(EQOS_MAC_BASE, QINQ_MAC_INNER_VLAN_INCL, 0xFFFFFFFFU,
+                        QINQ_VLAN_INCL_VLTI | QINQ_VLAN_INCL_VLP | QINQ_VLAN_INCL_VLC_INSERT))
+        return -1;
     passes += qinq_case('A', true,  QINQ_IVTIR_NONE, QINQ_VTIR_INSERT, false, 8U,
                         "MAC_Inner_VLAN_Incl VLP=1 VLC=insert, context S 07D0 + C 0064, VTIR=insert");
-    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, QINQ_MAC_INNER_VLAN_INCL, 0U);
+    if (!ETH_REG_UPDATE(EQOS_MAC_BASE, QINQ_MAC_INNER_VLAN_INCL, 0xFFFFFFFFU, 0U))
+        return -1;
     passes += qinq_case('B', false, QINQ_IVTIR_NONE, QINQ_VTIR_INSERT, false, 4U,
                         "MAC_Inner_VLAN_Incl = 0, no new context, VTIR=insert: only the stored outer S tag");
 
     /* ---------- 3. C, D, E: inner tag decided by the context (VLP = 0, IVTIR) ---------- */
-    AX_BASE_WRITE_REG32(EQOS_MAC_BASE, QINQ_MAC_INNER_VLAN_INCL, QINQ_VLAN_INCL_VLTI);
+    if (!ETH_REG_UPDATE(EQOS_MAC_BASE, QINQ_MAC_INNER_VLAN_INCL, 0xFFFFFFFFU, QINQ_VLAN_INCL_VLTI))
+        return -1;
     passes += qinq_case('C', true,  QINQ_IVTIR_INSERT,  QINQ_VTIR_INSERT, false, 8U,
                         "VLP=0, context IVTIR=insert, VTIR=insert: two tags, decided by the descriptor");
     passes += qinq_case('D', true,  QINQ_IVTIR_REPLACE, QINQ_VTIR_NONE,   true,  8U,

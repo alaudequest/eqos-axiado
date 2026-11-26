@@ -23,7 +23,7 @@
  * 31: TEST_DMA_CH0_PKT_TXRX         - B0-style eth_egress_packet*() / eth_ingress_packet() on CH0
  * 48: TEST_MAC_VIR_QINQ             - MAC_VLAN_Incl / MAC_Inner_VLAN_Incl QinQ, TX context VT / IVT / IVTIR, cases A-E
  */
-int eth_run_test_ops = TEST_DMA_CH0_PKT_TXRX;
+int eth_run_test_ops = TEST_MAC_TXFC_PAUSE_TIMESTAMP;
 
 /* Called by main() after the board init, and again on each USER button press */
 int do_test(void)

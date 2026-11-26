@@ -7,8 +7,7 @@
 /* ETH_MACVTR double VLAN: filter on the inner C-VLAN tag (ERIVLT=1).
  * Flow: MAC_VTR_DVLAN_flow.md.
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * MACVTR: EDVLP=1 ESVL=1 ETV=1 ERIVLT=1 ERSVLM=0 VL=100; MACPFR.VTFE=1.
  * Frame (68 B, FCS excluded):

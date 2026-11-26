@@ -16,7 +16,7 @@
 #include "../../../../0_test_cases/MAC_PFR_HASH_UC.c"
 #include "../../../../0_test_cases/MAC_WTR_WATCHDOG.c"
 /* Both TXFC files define txfc_tx_buf / txfc_rx_frame: build only one of them */
-#define ETH_TXFC_TIMESTAMP  0
+#define ETH_TXFC_TIMESTAMP  1
 #if ETH_TXFC_TIMESTAMP
 #include "../../../../0_test_cases/MAC_Q0_TX_FLOW_CTRL_PAUSE_TIMESTAMP.c"
 #else
@@ -30,6 +30,34 @@
 #include "../../../../0_test_cases/DMA_CH0_PKT_TXRX.c"
 #include "../../../../0_test_cases/MAC_VIR_QINQ.c"
 
+/* Tests in this build: one line each (ID of eth_config_test_case.h, name for the banner, entry) */
+static const struct {
+	int id;
+	const char *name;
+	int (*run)(struct eqos_dev *eth, struct eqos_desc *tx_desc, struct eqos_desc *rx_desc,
+	           uint8_t rx_buf[][EQOS_BUF_SIZE]);
+} eth_tests[] = {
+	{TEST_RMII_VLAN_FILTER,         "RMII_VLAN_FILTER",         eth_test_vlan_filter},
+	{TEST_RMII_DROP_NON_TCP_UDP,    "RMII_DROP_NON_TCP_UDP",    eth_test_drop_non_tcp_udp},
+	{TEST_RMII_MAC_RX_CRC_ERROR,    "RMII_MAC_RX_CRC_ERROR",    eth_test_mac_rx_crc_error},
+	{TEST_MAC_CTRL_SARC,            "MAC_CTRL_SARC",            eth_test_mac_ctrl_sarc},
+	{TEST_MAC_CTRL_GPSLCE,          "MAC_CTRL_GPSLCE",          eth_test_mac_ctrl_gpslce},
+	{TEST_MAC_PFR_HASH_UC,          "MAC_PFR_HASH_UC",          eth_test_mac_pfr_hash_uc},
+	{TEST_MAC_WTR_WATCHDOG,         "MAC_WTR_WATCHDOG",         eth_test_mac_wtr_watchdog},
+#if ETH_TXFC_TIMESTAMP
+	{TEST_MAC_TXFC_PAUSE_TIMESTAMP, "MAC_TXFC_PAUSE_TIMESTAMP", eth_test_mac_txfc_pause_timestamp},
+#else
+	{TEST_MAC_TXFC_PAUSE,           "MAC_TXFC_PAUSE",           eth_test_mac_txfc_pause},
+#endif
+	{TEST_MAC_VTR_DVLAN_OUTER,      "MAC_VTR_DVLAN_OUTER",      eth_test_mac_vtr_dvlan_outer},
+	{TEST_MAC_VTR_DVLAN_INNER,      "MAC_VTR_DVLAN_INNER",      eth_test_mac_vtr_dvlan_inner},
+	{TEST_MAC_VTR_DVLAN_STRIP,      "MAC_VTR_DVLAN_STRIP",      eth_test_mac_vtr_dvlan_strip},
+	{TEST_MAC_ISR_MMC_TX,           "MAC_ISR_MMC_TX",           eth_test_mac_isr_mmc_tx},
+	{TEST_MTL_RXQ0_OVERFLOW,        "MTL_RXQ0_OVERFLOW",        eth_test_mtl_rxq0_overflow},
+	{TEST_DMA_CH0_PKT_TXRX,         "DMA_CH0_PKT_TXRX",         eth_test_dma_ch0_pkt_txrx},
+	{TEST_MAC_VIR_QINQ,             "MAC_VIR_QINQ",             eth_test_mac_vir_qinq},
+};
+
 /**
  * RMII[mac_idx] MAC loopback test, selected by eth_run_test_ops (TEST_* IDs, list in
  * src/L0_MK_RMII_MAIN_FILE.c):
@@ -38,61 +66,32 @@
  *   mac_init_100m()         DMA, rings, MTL, MAC_Address0, MAC_Configuration (DMA stopped)
  *   init_mac_internal_lb()  MAC_Configuration.LM = 1
  *   mac_start()             DMA ST / SR, then MAC TE / RE
- *   test function           eth_test_xxx(&eth, tx_desc, rx_desc, rx_buf) = failure count
+ *   eth_tests[i].run()      eth_test_xxx(&eth, tx_desc, rx_desc, rx_buf) = failure count
  * Return 1: PASS, 0: FAIL
  */
 uint16_t eth_rmii_mac_lb(uint8_t mac_idx)
 {
+	const uint32_t count = sizeof(eth_tests) / sizeof(eth_tests[0]);
+	uint32_t i = 0;
 	int fail = -1;
 
-	printf("======== RMII[%d] - START TEST %d ========\r\n", mac_idx, eth_run_test_ops);
+	while (i < count && eth_tests[i].id != eth_run_test_ops)
+		i++;
+	if (i == count) {
+		printf("Test %d is not in this build\r\n", eth_run_test_ops);
+		return 0;
+	}
+
+	printf("======== RMII[%d] - START TEST %d %s ========\r\n", mac_idx, eth_run_test_ops, eth_tests[i].name);
 
 	if (eth_stm32_init(mac_idx) == 1 && eth_reset_mac(&eth) == 1) {
 		mac_init_100m(&eth);
 		init_mac_internal_lb(&eth);
 		mac_start(&eth);
-
-		if (eth_run_test_ops == TEST_RMII_VLAN_FILTER) {
-			fail = eth_test_vlan_filter(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_RMII_DROP_NON_TCP_UDP) {
-			fail = eth_test_drop_non_tcp_udp(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_RMII_MAC_RX_CRC_ERROR) {
-			fail = eth_test_mac_rx_crc_error(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_CTRL_SARC) {
-			fail = eth_test_mac_ctrl_sarc(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_CTRL_GPSLCE) {
-			fail = eth_test_mac_ctrl_gpslce(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_PFR_HASH_UC) {
-			fail = eth_test_mac_pfr_hash_uc(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_WTR_WATCHDOG) {
-			fail = eth_test_mac_wtr_watchdog(&eth, tx_desc, rx_desc, rx_buf);
-#if ETH_TXFC_TIMESTAMP
-		} else if (eth_run_test_ops == TEST_MAC_TXFC_PAUSE_TIMESTAMP) {
-			fail = eth_test_mac_txfc_pause_timestamp(&eth, tx_desc, rx_desc, rx_buf);
-#else
-		} else if (eth_run_test_ops == TEST_MAC_TXFC_PAUSE) {
-			fail = eth_test_mac_txfc_pause(&eth, tx_desc, rx_desc, rx_buf);
-#endif
-		} else if (eth_run_test_ops == TEST_MAC_VTR_DVLAN_OUTER) {
-			fail = eth_test_mac_vtr_dvlan_outer(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_VTR_DVLAN_INNER) {
-			fail = eth_test_mac_vtr_dvlan_inner(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_VTR_DVLAN_STRIP) {
-			fail = eth_test_mac_vtr_dvlan_strip(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_ISR_MMC_TX) {
-			fail = eth_test_mac_isr_mmc_tx(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MTL_RXQ0_OVERFLOW) {
-			fail = eth_test_mtl_rxq0_overflow(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_DMA_CH0_PKT_TXRX) {
-			fail = eth_test_dma_ch0_pkt_txrx(&eth, tx_desc, rx_desc, rx_buf);
-		} else if (eth_run_test_ops == TEST_MAC_VIR_QINQ) {
-			fail = eth_test_mac_vir_qinq(&eth, tx_desc, rx_desc, rx_buf);
-		} else {
-			printf("Test %d is not in this build\r\n", eth_run_test_ops);
-		}
+		fail = eth_tests[i].run(&eth, tx_desc, rx_desc, rx_buf);
 	}
 
-	printf("======== RMII[%d] - END TEST (%d failure(s)) ========\r\n", mac_idx, fail);
+	printf("======== RMII[%d] - END TEST %s (%d failure(s)) ========\r\n", mac_idx, eth_tests[i].name, fail);
 	return (fail == 0) ? 1 : 0;
 }
 

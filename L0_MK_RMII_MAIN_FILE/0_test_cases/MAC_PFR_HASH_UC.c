@@ -6,8 +6,7 @@
 
 /* ETH_MACPFR.HUC (bit 1) unicast hash table filtering test.
  *
- * main.c includes this file AFTER the TX/RX rings are declared; do not add
- * it as a separate build source.
+ * eth_function_stm32.c includes this file; do not add it as a separate build source.
  *
  * HUC=1, HPF=0: unicast frames are filtered ONLY by the 64-bit hash table
  * (ETH_MACHT1R:HT0R); the perfect filter (MAC Address0) is not used.
